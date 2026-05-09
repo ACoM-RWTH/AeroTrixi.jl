@@ -90,4 +90,4 @@ In addition, you can also refer to Trixi.jl directly as
 Furthermore, a lot of repository logistics and their structure (GitHub CI, testing, docs, etc.) are taken straight from `Trixi.jl`.
 Thus, we greatly acknowledge all efforts from the [Trixi.jl Authors](https://github.com/trixi-framework/Trixi.jl/blob/main/AUTHORS.md).
 
-We also thank Arpit Babbar who provided the [first implementation](https://github.com/trixi-framework/Trixi.jl/pull/1920) of point-wise analysis quantities.
+We also thank [Arpit Babbar](https://github.com/Arpit-Babbar) who provided the [first implementation](https://github.com/trixi-framework/Trixi.jl/pull/1920) of point-wise analysis quantities.
