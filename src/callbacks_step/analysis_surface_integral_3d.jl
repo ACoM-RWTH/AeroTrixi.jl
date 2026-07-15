@@ -5,13 +5,11 @@
 @muladd begin
 #! format: noindent
 
-# TODO: Add once https://github.com/trixi-framework/Trixi.jl/pull/2974 is merged
 # Compute the three components of the 2D symmetric viscous stress tensor
 # (tau_11, tau_12, tau_22) based on the gradients of the velocity field.
 # This is required for drag and lift coefficients based on shear stress,
 # as well as for the non-integrated quantities such as
 # skin friction coefficient (to be added).
-#=
 function viscous_stress_tensor(u, equations_parabolic,
                                gradients_1, gradients_2, gradients_3)
     _, dv1dx, dv2dx, dv3dx, _ = convert_derivative_to_primitive(u, gradients_1,
@@ -45,7 +43,6 @@ function viscous_stress_tensor(u, equations_parabolic,
                   tau_22, tau_23,
                   tau_33)
 end
-=#
 
 # 3D viscous stress vector based on contracting the viscous stress tensor
 # with the normalized `normal_direction` vector.

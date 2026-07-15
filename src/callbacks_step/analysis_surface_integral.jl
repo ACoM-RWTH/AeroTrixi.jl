@@ -10,5 +10,8 @@
 abstract type VariableViscous end
 
 include("analysis_surface_integral_2d.jl")
-include("analysis_surface_integral_3d.jl")
+
+# Contains viscous stress tensor/vector (currently not used, since
+# `SurfaceFrictionCoefficient` is not yet implemented for 3D)
+#include("analysis_surface_integral_3d.jl")
 end # muladd

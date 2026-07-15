@@ -1,6 +1,6 @@
 .vscode/
-Manifest.toml
 out/
-run*/
+run/
+Manifest.toml
 *.inp
 *.h5

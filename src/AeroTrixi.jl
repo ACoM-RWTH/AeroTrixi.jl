@@ -24,12 +24,14 @@ using Trixi: @printf, @sprintf, print_level_information,
              index_to_start_step_2d, index_to_start_step_3d,
              analyze_integrals, calc_error_norms,
              h5open,
-             convert_derivative_to_primitive
+             convert_derivative_to_primitive,
+             viscous_stress_tensor # 2D version in main Trixi.jl
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
-              initialize!,
-              viscous_stress_tensor # 3D version not in main Trixi.jl
+              initialize!
+
+#viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
 using MuladdMacro: @muladd
 using StaticArrays: SVector, SMatrix, SArray, MVector, MArray

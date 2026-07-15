@@ -12,9 +12,7 @@ function viscous_stress_vector(u, normal_direction, equations_parabolic,
     #  Normalize normal direction, should point *into* the fluid => *(-1)
     n_normal = -normal_direction / norm(normal_direction)
 
-    # TODO: Adapt to https://github.com/trixi-framework/Trixi.jl/pull/2974
-    tau_11, tau_12, tau_22 = viscous_stress_tensor(u, normal_direction,
-                                                   equations_parabolic,
+    tau_11, tau_12, tau_22 = viscous_stress_tensor(u, equations_parabolic,
                                                    gradients_1, gradients_2)
 
     # Viscous stress vector: Stress tensor * normal vector
