@@ -44,7 +44,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
     # Restore boundary values for parabolic equations
     # which overwrite the solution boundary values with the gradients
     if semi isa SemidiscretizationHyperbolicParabolic
-        prolong2boundaries!(cache, u, mesh, equations, dg)
+        prolong2boundaries!(nothing, cache, u, mesh, equations, dg)
     end
 
     dim = 2 # Follows from mesh dispatch 
@@ -118,7 +118,7 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
 
     # Restore boundary values for parabolic equations
     # which overwrite the solution boundary values with the gradients
-    prolong2boundaries!(cache, u, mesh, equations, dg)
+    prolong2boundaries!(nothing, cache, u, mesh, equations, dg)
 
     dim = 2 # Follows from mesh dispatch 
     n_nodes = nnodes(dg)
