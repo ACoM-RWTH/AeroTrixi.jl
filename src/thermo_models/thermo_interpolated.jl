@@ -8,7 +8,7 @@
     # species' atomic/molecular masses and their inverses are stored in the `mass` array
     # ALL quantities are stored in dimensionless, with scaling provided via a ReferenceFlowQuantities instance
     # T_tol sets the tolerance for the Newton solver for T(e)
-    struct ThermoData1T{I<:Interpolation, CvO<:CvTableOffset, NCOMP} <: ThermoData{I, CvO, NCOMP}
+    struct ThermoData1T{I<:Interpolation, CvO<:CvTableOffset, NCOMP} <: ThermoData
         ref_q::ReferenceFlowQuantities
         
         mass::SVector{NCOMP, Float64} # molecular mass of each component
@@ -199,11 +199,11 @@
         end
     end
 
-    @inline function ncomponents(thermodata::ThermoData{I, CvO, NCOMP}) where {I, CvO, NCOMP}
+    @inline function ncomponents(thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
         NCOMP
     end
 
-    @inline function eachcomponent(thermodata::ThermoData)
+    @inline function eachcomponent(thermodata::ThermoData1T)
         Base.OneTo(ncomponents(thermodata))
     end
 
@@ -260,7 +260,7 @@
 
     # compute specific energy of flow given values of interpolation point and fractional position 
     # rho_inv = 1/rho
-    @inline function energy(u, rho_inv, index_lower_e, fracpos_e, thermodata::ThermoData{I, CvO, NCOMP}) where {I, CvO, NCOMP}
+    @inline function energy(u, rho_inv, index_lower_e, fracpos_e, thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
         result = 0.0
         @inbounds for i in eachcomponent(thermodata)
             result += energy_component(i, index_lower_e, fracpos_e, thermodata) * u[i + 3]
@@ -270,7 +270,7 @@
 
     # compute specific heat capacity of flow given values of interpolation point and fractional position 
     # rho_inv = 1/rho
-    @inline function c_v(u, rho_inv, index_lower_c, fracpos_c, thermodata::ThermoData{I, CvO, NCOMP}) where {I, CvO, NCOMP}
+    @inline function c_v(u, rho_inv, index_lower_c, fracpos_c, thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
         result = 0.0
         @inbounds for i in eachcomponent(thermodata)
             result += c_v_component(i, index_lower_c, fracpos_c, thermodata) * u[i + 3]
@@ -279,7 +279,7 @@
     end
 
     # compute ∫ c_v / T dT for a single component using linear interpolation
-    @inline function entropy_c_v_integral_component(i_comp, index_lower_c, fracpos_c, T_b, thermodata::ThermoData{LinearInterpolation, CvO, NCOMP}) where {CvO, NCOMP}
+    @inline function entropy_c_v_integral_component(i_comp, index_lower_c, fracpos_c, T_b, thermodata::ThermoData1T{LinearInterpolation, CvO, NCOMP}) where {CvO, NCOMP}
         @inbounds T_a = thermodata.T_c_arr[index_lower_c]
         @inbounds T_a_inv = thermodata.T_c_arr_inv[index_lower_c]
 

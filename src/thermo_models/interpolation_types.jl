@@ -9,4 +9,4 @@ struct NoCvOffset <: CvTableOffset end
 struct CvOffset <: CvTableOffset end
 
 # abstract container for thermodynamic data
-abstract type ThermoData{I<:Interpolation, CvO<:CvTableOffset, NCOMP, NMOLCOMP} end
+abstract type ThermoData end
