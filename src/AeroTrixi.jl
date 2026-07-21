@@ -36,13 +36,14 @@ import Trixi: pretty_form_ascii, pretty_form_utf,
 using MuladdMacro: @muladd
 using StaticArrays: SVector, SMatrix, SArray, MVector, MArray
 using LinearAlgebra: norm
+using FlowRef: ReferenceFlowQuantities
 
 include("auxiliary.jl")
 
 include("callbacks_step/callbacks_step.jl")
 
 include("constants.jl")
-
+include("thermo_models/interpolation_types.jl")
 include("thermo_models/spectra.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
@@ -54,5 +55,6 @@ export e_rot_cont, c_rot_cont, generate_e_c_rot_cont
 export e_vibr_iho, c_vibr_iho, generate_e_c_vibr_iho
 export generate_e_vibr_arr_harmonic_cutoff_K, generate_e_vibr_arr_anharmonic_cutoff_K
 export e_vibr_from_array, c_vibr_from_array, generate_e_c_vibr_from_array
+export LinearInterpolation, CvOffset, NoCvOffset
 
 end
