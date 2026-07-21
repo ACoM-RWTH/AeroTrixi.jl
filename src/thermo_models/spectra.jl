@@ -45,7 +45,8 @@ end
 # units of computed array are K
 function generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_diss; ground_level_energy_zero = true)
     offset = ground_level_energy_zero ? 0.0 : 0.5
-    i_max = trunc(Int, (E_diss / Θ - offset))  # find maximum level before vibrational energy exceeds dissociation energy
+    i_max = trunc(Int, (E_diss / Θ - 0.5))  # find maximum level before vibrational energy exceeds dissociation energy
+    # this is with respect to the energy ladder with non-zero ground level energy
     return (collect(0:i_max) .+ offset) .* Θ  # units are K
 end
 
