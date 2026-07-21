@@ -44,6 +44,7 @@ include("callbacks_step/callbacks_step.jl")
 
 include("thermo_models/interpolation_types.jl")
 include("thermo_models/spectra.jl")
+include("thermo_models/thermo_interpolated.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        AnalysisCallback,
