@@ -380,8 +380,9 @@
     end
 
     # compute adiabatic index γ(T) via interpolation
-    @inline function get_gamma(u, rho, index_lower_c, fracpos_c, thermodata::ThermoData1T)
-        c_v_val = c_v(u, rho, index_lower_c, fracpos_c, thermodata)
+    # rho_inv = 1/rho
+    @inline function get_gamma(u, rho_inv, index_lower_c, fracpos_c, thermodata::ThermoData1T)
+        c_v_val = c_v(u, rho_inv, index_lower_c, fracpos_c, thermodata)
         c_p = 0.0
 
         # c_p = c_v + \sum_i rho_i k/m_i/rho =(scaling)= \sum_i rho_i' 1.0/m_i'/rho' (' denotes scaled variables)
@@ -389,6 +390,6 @@
             c_p += u[i + 3] * thermodata.inv_mass[i]
         end
 
-        return (c_v_val + c_p / rho) / c_v_val
+        return (c_v_val + c_p * rho_inv) / c_v_val
     end
 end # @muladd
