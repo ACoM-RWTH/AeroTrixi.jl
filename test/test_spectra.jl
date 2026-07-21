@@ -3,7 +3,9 @@ module TestSpectra
 using Test
 using AeroTrixi
 
-using AeroTrixi: k_B, e_c_none, Z_vibr, avg_over_vibr_array
+using AeroTrixi: k_B, e_c_none, Z_vibr, avg_over_vibr_array,
+                 ThermoData1T, ReferenceFlowQuantities,
+                 get_index_lower_fracpos, energy_component, c_v_component
 
 # characteristic vibrational temperature, anharmonicity and dissociation energy,
 # all in K; loosely modelled on N2
@@ -52,20 +54,44 @@ end
         @test ve_offset ≈ [(i - 0.5) * Θ for i in eachindex(ve_offset)]
         @test all(diff(ve_offset) .≈ Θ)
 
-        # the offset ladder is still cut off below the dissociation energy
+        # the offset only shifts the energies; the number of levels is fixed by the
+        # cutoff, which is applied to the unshifted ladder E_i = (i + 1/2) Θ
+        @test length(ve_offset) == length(ve_zero)
+        @test length(ve_offset) == ceil(Int, E_DISS / Θ - 0.5)
         @test ve_offset[end] < E_DISS
         @test ve_offset[end] + Θ > E_DISS
 
-        # the cutoff is applied to the shifted energies, so the offset ladder can
-        # hold at most as many levels as the zero-based one
-        @test length(ve_offset) <= length(ve_zero)
-        @test length(ve_offset) ==
-              trunc(Int, E_DISS / Θ - 0.5) + 1
-
-        # for these values both ladders have the same number of levels, so they
-        # differ by exactly the zero-point energy
-        @test length(ve_offset) == length(ve_zero)
+        # having the same number of levels, the two ladders differ by exactly the
+        # zero-point energy
         @test ve_offset .- ve_zero ≈ fill(0.5 * Θ, length(ve_zero))
+    end
+
+    @testset "harmonic ladder: cutoff uses the unshifted energies" begin
+        # E_diss / Θ is chosen with fractional parts both below and above 1/2, so
+        # that cutting on the unshifted ladder differs from cutting on the shifted
+        # one; these constants distinguish the two rules. 76200 puts a level exactly
+        # at the dissociation energy, which must be excluded
+        for E_diss in (75840.0, E_DISS, 76200.0, 76800.0, 77000.0)
+            ve_zero = generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_diss;
+                                                            ground_level_energy_zero = true)
+            ve_offset = generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_diss;
+                                                              ground_level_energy_zero = false)
+
+            # the level count never depends on where the ground level is put
+            @test length(ve_zero) == length(ve_offset)
+
+            # the last unshifted level is below the dissociation energy, the next is not
+            n = length(ve_offset)
+            @test (n - 0.5) * Θ < E_diss
+            @test (n + 0.5) * Θ >= E_diss
+
+            # the vanishing-anharmonicity limit of the anharmonic generator, which
+            # cuts on the unshifted ladder by construction, must agree exactly
+            @test ve_zero ≈ generate_e_vibr_arr_anharmonic_cutoff_K(Θ, 0.0, E_diss;
+                                                                    ground_level_energy_zero = true)
+            @test ve_offset ≈ generate_e_vibr_arr_anharmonic_cutoff_K(Θ, 0.0, E_diss;
+                                                                      ground_level_energy_zero = false)
+        end
     end
 
     @testset "anharmonic ladder" begin
@@ -285,6 +311,63 @@ end
 
     @testset "no internal degrees of freedom" begin
         @test e_c_none(M, T_LO, T_MID) == (0.0, 0.0)
+    end
+
+    @testset "generated energy/specific heat functions" begin
+        ve = generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_DISS)
+
+        generated = ("rotational" => (generate_e_c_rot_cont(),
+                                      (m, T) -> e_rot_cont(m, T),
+                                      (m, T) -> c_rot_cont(m, T)),
+                     "vibrational, IHO" => (generate_e_c_vibr_iho(Θ),
+                                            (m, T) -> e_vibr_iho(m, Θ, T),
+                                            (m, T) -> c_vibr_iho(m, Θ, T)),
+                     "vibrational, from array" => (generate_e_c_vibr_from_array(ve),
+                                                   (m, T) -> e_vibr_from_array(m, ve, T),
+                                                   (m, T) -> c_vibr_from_array(m, ve, T)))
+
+        for (name, (f, e_ref, c_ref)) in generated
+            @testset "$name" begin
+                # the generators return a callable, not a value
+                @test f isa Function
+
+                for T in TEMPERATURES
+                    # the contract `ThermoData1T` relies on: called with a mass and
+                    # two temperatures, returning an indexable (e, c) pair
+                    res = f(M, T, T)
+                    @test res isa Tuple{Float64, Float64}
+                    @test res[1] ≈ e_ref(M, T)
+                    @test res[2] ≈ c_ref(M, T)
+                end
+
+                # energy and specific heat are evaluated at their own temperature,
+                # which is what makes the pair usable for multi-temperature models
+                e, c = f(M, T_LO, T_HI)
+                @test e ≈ e_ref(M, T_LO)
+                @test c ≈ c_ref(M, T_HI)
+            end
+        end
+    end
+
+    @testset "generated functions drive ThermoData1T" begin
+        # reference quantities equal to one, i.e. scaling is the identity
+        ref_q = ReferenceFlowQuantities(ntuple(_ -> 1.0, 14)...)
+
+        T_min, T_max, ΔT = 100.0, 5000.0, 10.0
+        td = ThermoData1T(ref_q, [M], [generate_e_c_vibr_iho(Θ)];
+                          T_min = T_min, T_max = T_max, ΔT = ΔT)
+
+        # at the tabulation points linear interpolation is exact, so the table has
+        # to reproduce the translational contribution plus the generated one
+        for T in (T_min, 1000.0, 2500.0, T_max - ΔT)
+            index_e, frac_e, index_c, frac_c = get_index_lower_fracpos(T, td)
+            @test frac_e≈0.0 atol=1e-12
+
+            @test energy_component(1, index_e, frac_e, td)≈1.5 * k_B * T / M +
+                                                           e_vibr_iho(M, Θ, T) rtol=1e-12
+            @test c_v_component(1, index_c, frac_c, td)≈1.5 * k_B / M +
+                                                        c_vibr_iho(M, Θ, T) rtol=1e-12
+        end
     end
 end
 
