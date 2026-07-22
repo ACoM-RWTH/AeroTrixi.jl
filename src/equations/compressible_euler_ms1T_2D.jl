@@ -102,7 +102,7 @@
         return temperature_rho_inv(u, rho_inv, 0.28*eint, eint, equations.thermodata)
     end
 
-    # compute total density and number density 
+    # compute total density and number density
     @inline function density_and_number_density(u, equations::CompressibleEulerEquationsMs1T2D)
         rho = zero(u[1])
         nrho = zero(u[1])
@@ -113,6 +113,17 @@
         end
 
         return rho, nrho
+    end
+
+    # compute number density
+    @inline function number_density(u, equations::CompressibleEulerEquationsMs1T2D)
+        nrho = zero(u[1])
+
+        @inbounds for i in eachcomponent(equations.thermodata)
+            nrho += u[i + 3] * equations.thermodata.inv_mass[i]
+        end
+
+        return nrho
     end
 
     # compute pressure
@@ -139,23 +150,11 @@
         return SVector(rho_v1, rho_v2, rho_e, rhos...)
     end
 
-    @inline function Trixi.cons2prim(u, equations::CompressibleEulerEquationsMs1T2D)
-        rho_v1, rho_v2, rho_e = u 
-
-        @inbounds prim_rho = SVector{ncomponents(equations), Float64}(u[i + 3]
-                                                                      for i in eachcomponent(equations))
-
-        rho = density(u, equations)
-        rho_inv = 1.0 / rho
-        v1 = rho_v1 * rho_inv
-        v2 = rho_v2 * rho_inv
-
-        e_internal = (rho_e - 0.5 * (rho_v1 * v1 + rho_v2 * v2)) * rho_inv
-
-        T = temperature(u, rho, rho_inv, e_internal, equations)
-        prim_other = SVector{3, Float64}(v1, v2, T)
-    
-        return vcat(prim_other, prim_rho)
+    # Convert conservative variables to primitive; the interpolation indices computed
+    # on the way are discarded, use `cons2prim_with_index` to keep them
+    @inline function cons2prim(u, equations::CompressibleEulerEquationsMs1T2D)
+        _, _, _, _, prim = cons2prim_with_index(u, equations)
+        return prim
     end
 
     @inline function pressure(T, u, equations::CompressibleEulerEquationsMs1T2D)
@@ -194,21 +193,28 @@
         return (cons..., rhos...)
     end
 
-    @inline function entropy_thermodynamic(u,rho, equations::CompressibleEulerEquationsMs1T2D)
-        #e = energy_internal_without_rho(cons, equations)  # get e
-        T = temperature(u, equations::CompressibleEulerEquationsMs1T2D)
-        s = entropy_c_v_integral(u, T, rho, equations) 
-        @inbounds for i in eachcomponent(equations)
-            s -= (u[i + 3] / rho) * log(u[i+3]) * equations.inv_mass[i] 
+    function varnames(::typeof(cons2prim),
+                      equations::CompressibleEulerEquationsMs1T2D)
+        prim = ("v1", "v2", "T")
+        rhos = ntuple(n -> "rho" * string(n), Val(ncomponents(equations.thermodata)))
+        return (prim..., rhos...)
+    end
+
+    @inline function entropy_thermodynamic(u, rho, equations::CompressibleEulerEquationsMs1T2D)
+        thermodata = equations.thermodata
+        T = temperature(u, equations)
+        s = entropy_c_v_integral(u, T, rho, thermodata)
+        # `abs` as in `cons2entropy`, so that a negative density from an
+        # under-resolved state gives a large number rather than a DomainError
+        @inbounds for i in eachcomponent(thermodata)
+            s -= (u[i + 3] / rho) * log(abs(u[i + 3])) * thermodata.inv_mass[i]
         end
         return s
     end
 
     @inline function entropy_thermodynamic(u, equations::CompressibleEulerEquationsMs1T2D)
-        
-        #e = energy_internal_without_rho(cons, equations)  # get e
-        rho=density(u, equations)
-        return entropy_thermodynamic(u,rho, equations)
+        rho = density(u, equations)
+        return entropy_thermodynamic(u, rho, equations)
     end
 
     @inline function entropy_math(u, equations::CompressibleEulerEquationsMs1T2D)
@@ -335,11 +341,11 @@
     @inline function flux_oblapenko(u_ll, u_rr, normal_direction::AbstractVector,
         equations::CompressibleEulerEquationsMs1T2D)
 
-        # (v1_ll, v2_ll, T_ll, rhos_ll...) = cons2prim(u_ll, equations)
-        # (v1_rr, v2_rr, T_rr, rhos_rr...) = cons2prim(u_rr, equations)
-    
-        (il_ll, fp_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
-        (il_rr, fp_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
+        thermodata = equations.thermodata
+        # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
+        # only for NoCvOffset
+        (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
+        (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
 
         v1_avg = 0.5*(v1_ll + v1_rr)
         v2_avg = 0.5*(v2_ll + v2_rr)
@@ -349,28 +355,21 @@
         velocity_square_avg = 0.5 * (v1_ll^2 + v2_ll^2 + v1_rr^2 + v2_rr^2)
         T_jump = T_rr - T_ll
 
-        # il_ll, fp_ll = get_index_lower_fracpos(T_ll, equations)
-        # il_rr, fp_rr = get_index_lower_fracpos(T_rr, equations)
-
         v_dot_n_ll = v1_ll * normal_direction[1] + v2_ll * normal_direction[2]
         v_dot_n_rr = v1_rr * normal_direction[1] + v2_rr * normal_direction[2]
 
         tmp_sum = 0.0
-        @inbounds for i in eachcomponent(equations)
-            tmp_sum = tmp_sum + 0.5*((abs(rhos_ll[i])+abs(rhos_rr[i]))*equations.inv_mass[i])
+        @inbounds for i in eachcomponent(thermodata)
+            tmp_sum = tmp_sum + 0.5*((abs(rhos_ll[i])+abs(rhos_rr[i]))*thermodata.inv_mass[i])
         end
 
-        v_dot_n_avg = 0.5f0 * (v_dot_n_ll + v_dot_n_rr)
+        v_dot_n_avg = 0.5 * (v_dot_n_ll + v_dot_n_rr)
 
-        @inbounds fx_rhos = SVector{ncomponents(equations), Float64}(Trixi.ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) *
-                                                           v_dot_n_avg for i in eachcomponent(equations))
+        @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) *
+                                                           v_dot_n_avg for i in eachcomponent(thermodata))
                                                            #use ln_mean function in math.jl
-        # fx_rhos_sum = sum(fx_rhos)
-        fx_rhos_sum = 0.0
-        @inbounds for i in eachcomponent(equations)
-            fx_rhos_sum += fx_rhos[i]
-        end
-        
+        fx_rhos_sum = sum(fx_rhos)
+
         p_avg = tmp_sum / inv_T_avg
         fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg * normal_direction[1]
         fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg * normal_direction[2]
@@ -378,24 +377,25 @@
 
         if (abs(T_jump) >= equations.min_T_jump)
             inv_T_jump = 1.0 / T_jump
-            @inbounds for i in eachcomponent(equations)
-                cv_Tast_over_Tast = (entropy_c_v_integral(i, il_rr, fp_rr, T_rr, equations)
-                                         - entropy_c_v_integral(i, il_ll, fp_ll, T_ll, equations)) * inv_T_jump
+            @inbounds for i in eachcomponent(thermodata)
+                cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, T_rr, thermodata)
+                                         - entropy_c_v_integral_component(i, ic_ll, T_ll, thermodata)) * inv_T_jump
 
-                e_int_ll = energy_component(i, il_ll, fp_ll, equations) 
-                e_int_rr = energy_component(i, il_rr, fp_rr, equations) 
+                e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
+                e_int_rr = energy_component(i, ie_rr, fe_rr, thermodata)
                 cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
-                
+
                 fx_e = fx_e + fx_rhos[i] * (0.5*(e_int_ll+e_int_rr) + T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg* cv_T_astast))
             end
         else
             T_mid = 0.5 * (T_ll + T_rr)
             inv_T_mid = 1.0 / T_mid
-            il_mid, fp_mid = get_index_lower_fracpos(T_mid, equations)
-            @inbounds for i in eachcomponent(equations)
-                cvmid = c_v(i, il_mid, fp_mid, equations)     
-                # cvmid = c_v(i, T_mid, equations)        
-                fx_e = fx_e + fx_rhos[i] * (0.5*(energy_component(i, il_ll, fp_ll, equations) + energy_component(i, il_rr, fp_rr,equations)) + T_geo_sqr * (cvmid  * (inv_T_mid - inv_T_avg)))
+            _, _, ic_mid, fc_mid = get_index_lower_fracpos(T_mid, thermodata)
+            @inbounds for i in eachcomponent(thermodata)
+                cvmid = c_v_component(i, ic_mid, fc_mid, thermodata)
+                fx_e = fx_e + fx_rhos[i] * (0.5*(energy_component(i, ie_ll, fe_ll, thermodata) +
+                                                 energy_component(i, ie_rr, fe_rr, thermodata))
+                                            + T_geo_sqr * (cvmid * (inv_T_mid - inv_T_avg)))
             end
         end
         return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
@@ -410,7 +410,7 @@
         v1 = rho_v1 * rhoinv
         v2 = rho_v2 * rhoinv
 
-        T = temperature_rhoinv(u, rhoinv, equations)
+        T = temperature(u, equations)
         p = pressure(T, u, equations)
 
         if orientation == 1
@@ -441,7 +441,7 @@
         v2 = rho_v2 * rhoinv
         v_normal = v1 * normal_direction[1] + v2 * normal_direction[2]
 
-        T = temperature_rhoinv(u, rhoinv, equations)
+        T = temperature(u, equations)
         p = pressure(T, u, equations)
 
         f_rho = densities(u, v_normal, equations)
@@ -454,30 +454,40 @@
         return vcat(f_other, f_rho)
     end
 
+    # sound speed of a state, given its temperature and the c_v interpolation stencil
+    # c^2 = gamma * p / rho, with p = n * T (n the number density)
+    @inline function sound_speed(u, rho, T, index_lower_c, fracpos_c,
+                                 equations::CompressibleEulerEquationsMs1T2D)
+        rho_inv = 1.0 / rho
+        gamma = get_gamma(u, rho_inv, index_lower_c, fracpos_c, equations.thermodata)
+        p = pressure(T, u, equations)
+        return sqrt(gamma * p * rho_inv)
+    end
+
     @inline function max_abs_speeds(u, equations::CompressibleEulerEquationsMs1T2D)
-        # println(u)
-        (index_lower, fracpos, (v1, v2, T, rhos...)) = cons2prim_with_index(u, equations)
-        # rho = sum(rhos)
+        (_, _, ic, fc, (v1, v2, T, rhos...)) = cons2prim_with_index(u, equations)
 
         rho = 0.0
         @inbounds for i in eachcomponent(equations)
             rho += rhos[i]
         end
-        # c = sqrt(gamma * p / rho)
-        gamma = get_gamma(u, rho, index_lower, fracpos, equations)
-        p = pressure(T, u, equations)
-        
-        c = sqrt(gamma * p / rho)
+
+        c = sound_speed(u, rho, T, ic, fc, equations)
         return abs(v1) + c, abs(v2) + c
     end
 
     @inline function max_abs_speed(u_ll, u_rr, orientation::Integer,
                                          equations::CompressibleEulerEquationsMs1T2D)
-        _, v1_ll, v2_ll, _, T_ll = cons2prim(u_ll, equations)
-        _, v1_rr, v2_rr, _, T_rr = cons2prim(u_rr, equations)
-        gamma_ll = get_gamma(T_ll, equations)
-        gamma_rr = get_gamma(T_rr, equations)
-    
+        (_, _, ic_ll, fc_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
+        (_, _, ic_rr, fc_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
+
+        rho_ll = 0.0
+        rho_rr = 0.0
+        @inbounds for i in eachcomponent(equations)
+            rho_ll += rhos_ll[i]
+            rho_rr += rhos_rr[i]
+        end
+
         # Get the velocity value in the appropriate direction
         if orientation == 1
             v_ll = v1_ll
@@ -486,53 +496,38 @@
             v_ll = v2_ll
             v_rr = v2_rr
         end
-        # Calculate sound speeds
-        # p = rho * T because everything is scaled
-        # c_ll = sqrt(gamma_ll * p_ll / rho_ll)
-        # c_rr = sqrt(gamma_rr * p_rr / rho_rr)
-        c_ll = sqrt(gamma_ll * T_ll)
-        c_rr = sqrt(gamma_rr * T_rr)
-    
+
+        # p = n * T, not rho * T, so the sound speed carries the mean molecular mass
+        c_ll = sound_speed(u_ll, rho_ll, T_ll, ic_ll, fc_ll, equations)
+        c_rr = sound_speed(u_rr, rho_rr, T_rr, ic_rr, fc_rr, equations)
+
         λ_max = max(abs(v_ll) + c_ll, abs(v_rr) + c_rr)
         return λ_max
     end
 
     @inline function max_abs_speed(u_ll, u_rr, normal_direction::AbstractVector,
                                          equations::CompressibleEulerEquationsMs1T2D)
-
-
-        (il_ll, fp_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
-        (il_rr, fp_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
-
-        # rho_ll = sum(rhos_ll)
-        # rho_rr = sum(rhos_rr)
+        (_, _, ic_ll, fc_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
+        (_, _, ic_rr, fc_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
 
         rho_ll = 0.0
         rho_rr = 0.0
-        for i in eachcomponent(equations)
+        @inbounds for i in eachcomponent(equations)
             rho_ll += rhos_ll[i]
             rho_rr += rhos_rr[i]
         end
-
-        gamma_ll = get_gamma(u_ll, rho_ll, il_ll, fp_ll, equations)
-        gamma_rr = get_gamma(u_rr, rho_rr, il_rr, fp_rr, equations)
-    
-        p_ll = pressure(T_ll, u_ll, equations)
-        p_rr = pressure(T_rr, u_rr, equations)
         # Calculate normal velocities and sound speed
         # left
         v_ll = (v1_ll * normal_direction[1]
                 +
                 v2_ll * normal_direction[2])
-        # c_ll = sqrt(gamma_ll * p_ll / rho_ll)
-        c_ll = sqrt(gamma_ll * p_ll / rho_ll)
+        c_ll = sound_speed(u_ll, rho_ll, T_ll, ic_ll, fc_ll, equations)
         # right
         v_rr = (v1_rr * normal_direction[1]
                 +
                 v2_rr * normal_direction[2])
-        # c_rr = sqrt(gamma_rr * p_rr / rho_rr)
-        c_rr = sqrt(gamma_rr * p_rr / rho_rr)
-    
+        c_rr = sound_speed(u_rr, rho_rr, T_rr, ic_rr, fc_rr, equations)
+
         norm_norm = norm(normal_direction)
         return max(abs(v_ll) + c_ll * norm_norm, abs(v_rr) + c_rr * norm_norm)
     end
@@ -550,7 +545,8 @@
     
         # compute the primitive variables
         # rho_local, v_normal, v_tangent, p_local, T_local = cons2prim(u_local, equations)
-        (v_x, v_y, T_local, rhos_local...) = cons2prim(u_inner, equations)
+        (_, _, ic, fc, (v_x, v_y, T_local, rhos_local...)) = cons2prim_with_index(u_inner,
+                                                                                 equations)
 
         # c = normal_vector[1]
         # s = normal_vector[2]
@@ -568,8 +564,8 @@
         @inbounds for i in eachcomponent(equations)
             rho_local += rhos_local[i]
         end
-        gamma_local = get_gamma(u_inner, rho_local, T_local, equations)
-    
+        gamma_local = get_gamma(u_inner, 1.0 / rho_local, ic, fc, equations.thermodata)
+
         p_local = pressure(T_local, u_inner, equations)
         # Get the solution of the pressure Riemann problem
         # See Section 6.3.3 of
@@ -590,10 +586,11 @@
         end
     
         # For the slip wall we directly set the flux as the normal velocity is zero
+        # `ntuple` over a `Val` keeps this allocation-free, unlike `zeros(...)...`
         return SVector(p_star * normal_direction[1],
                        p_star * normal_direction[2],
                        0.0,
-                       zeros(ncomponents(equations))...)
+                       ntuple(_ -> 0.0, Val(ncomponents(equations)))...)
     end
     
     """

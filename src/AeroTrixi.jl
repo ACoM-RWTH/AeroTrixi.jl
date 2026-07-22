@@ -32,8 +32,13 @@ using Trixi: @printf, @sprintf, print_level_information,
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
               initialize!,
-              varnames, cons2entropy, prim2cons, cons2prim, varnames, density, pressure,
-              flux, max_abs_speed, max_abs_speeds
+              varnames, cons2prim, prim2cons, cons2entropy,
+              density, pressure, temperature,
+              energy_total, energy_kinetic, energy_internal,
+              entropy, entropy_math, entropy_thermodynamic,
+              ncomponents, eachcomponent,
+              flux, max_abs_speed, max_abs_speeds,
+              boundary_condition_slip_wall
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
@@ -60,6 +65,6 @@ export e_vibr_iho, c_vibr_iho, generate_e_c_vibr_iho
 export generate_e_vibr_arr_harmonic_cutoff_K, generate_e_vibr_arr_anharmonic_cutoff_K
 export e_vibr_from_array, c_vibr_from_array, generate_e_c_vibr_from_array
 export LinearInterpolation, CvOffset, NoCvOffset
-export CompressibleEulerEquationsMs1T2D
+export CompressibleEulerEquationsMs1T2D, flux_oblapenko
 
 end
