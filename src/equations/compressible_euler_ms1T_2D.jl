@@ -136,8 +136,20 @@
         return p
     end
 
+    # rho * p, used as the shock-capturing indicator variable
+    @inline function density_pressure(u, equations::CompressibleEulerEquationsMs1T2D)
+        rho, nrho = density_and_number_density(u, equations)
+        rho_inv = 1.0 / rho
+
+        @inbounds e_internal = (u[3] - 0.5 * (u[1]^2 + u[2]^2) * rho_inv) * rho_inv
+        T = temperature_rho_inv(u, rho_inv, 0.28 * e_internal, e_internal,
+                                equations.thermodata)
+
+        return rho * T * nrho
+    end
+
     # convert primitive to conservative variables
-    @inline function prim2cons(prim, equations::CompressibleEulerEquationsMs1T2D) 
+    @inline function prim2cons(prim, equations::CompressibleEulerEquationsMs1T2D)
         (v1, v2, T, rhos...) = prim
 
         rho = 0.0
