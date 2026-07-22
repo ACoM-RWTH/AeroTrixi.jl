@@ -32,7 +32,8 @@ using Trixi: @printf, @sprintf, print_level_information,
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
               initialize!,
-              varnames, cons2entropy, prim2cons, cons2prim, varnames, density, pressure
+              varnames, cons2entropy, prim2cons, cons2prim, varnames, density, pressure,
+              flux, max_abs_speed, max_abs_speeds
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
