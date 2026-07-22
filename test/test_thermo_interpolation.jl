@@ -82,6 +82,60 @@ T_lo() = 1.0001 * T_MIN
 T_hi() = 0.9999 * T_MAX
 sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
 
+# ------------------------------------------------------------------------------
+# Second test model
+#
+# The model above has a constant c_v, so the slope of c_v inside a cell is zero
+# and the partial-cell term of the entropy integral is never exercised. The
+# tables below give c_v a non-zero slope.
+#
+# c_v_i(T) = A[i] + B[i] * T is reproduced exactly by linear interpolation on
+# either grid, so ∫ c_v / T dT has a closed form that the tabulated result must
+# match to machine precision at any temperature, on or off a grid point:
+#     ∫_{T_0}^{T} (A + B τ) / τ dτ = A log(T / T_0) + B (T - T_0)
+# ------------------------------------------------------------------------------
+
+const A_LIN = [2.0 * k_B / MASSES[1], 3.0 * k_B / MASSES[2]]
+const B_LIN = [7.0e-4 * k_B / MASSES[1], -3.0e-4 * k_B / MASSES[2]]
+
+# the internal contribution has to exclude the translational part the table adds
+const E_C_FUNS_LIN = [(m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
+                                        0.5 * B_LIN[1] * T_e^2,
+                                        (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+                                        B_LIN[1] * T_c),
+                      (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
+                                        0.5 * B_LIN[2] * T_e^2,
+                                        (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+                                        B_LIN[2] * T_c)]
+
+# c_v_i(T) = A + B T + C T^2 is *not* reproduced exactly, so the tabulated
+# integral converges to the closed form at second order in ΔT
+const C_QUAD = [4.0e-8 * k_B / MASSES[1], 9.0e-8 * k_B / MASSES[2]]
+
+const E_C_FUNS_QUAD = [(m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
+                                         0.5 * B_LIN[1] * T_e^2 +
+                                         C_QUAD[1] * T_e^3 / 3,
+                                         (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+                                         B_LIN[1] * T_c + C_QUAD[1] * T_c^2),
+                       (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
+                                         0.5 * B_LIN[2] * T_e^2 +
+                                         C_QUAD[2] * T_e^3 / 3,
+                                         (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+                                         B_LIN[2] * T_c + C_QUAD[2] * T_c^2)]
+
+build_lin(offset; step = ΔT) = ThermoData1T(identity_ref_q(), copy(MASSES), E_C_FUNS_LIN;
+                                            T_min = T_MIN, T_max = T_MAX, ΔT = step,
+                                            cv_table_offset = offset)
+
+build_quad(offset; step = ΔT) = ThermoData1T(identity_ref_q(), copy(MASSES),
+                                             E_C_FUNS_QUAD;
+                                             T_min = T_MIN, T_max = T_MAX, ΔT = step,
+                                             cv_table_offset = offset)
+
+# deliberately not multiples of ΔT away from T_MIN, so that the fractional
+# position inside the cell is non-zero and the partial-cell term is exercised
+const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
+
 @testset "ThermoData1T" begin
     @testset "table sizes and grids" begin
         for offset in (false, true)
@@ -260,6 +314,95 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
 
                 @test entropy_c_v_integral(u, T, rho, td)≈c_v_exact *
                                                           log(T / T_0) rtol=1e-11
+            end
+        end
+    end
+
+    @testset "linear c_v is interpolated exactly" begin
+        for offset in (false, true)
+            td = build_lin(offset)
+            for T in T_OFF_GRID
+                _, _, index_c, frac_c = get_index_lower_fracpos(T, td)
+                for i in eachcomponent(td)
+                    @test c_v_component(i, index_c, frac_c,
+                                        td)≈A_LIN[i] + B_LIN[i] * T rtol=1e-12
+                end
+            end
+        end
+    end
+
+    @testset "entropy integral with a non-zero c_v slope" begin
+        for offset in (false, true)
+            td = build_lin(offset)
+            rho = 1.7
+            u = state(rho)
+            T_0 = td.T_c_arr[1]
+
+            exact(i, T) = A_LIN[i] * log(T / T_0) + B_LIN[i] * (T - T_0)
+
+            for T in T_OFF_GRID
+                _, _, index_c, _ = get_index_lower_fracpos(T, td)
+
+                # a non-zero fractional position is what makes this test meaningful
+                @test index_c < size(td.c_v_arr, 1)
+
+                for i in eachcomponent(td)
+                    @test entropy_c_v_integral_component(i, index_c, T,
+                                                         td)≈exact(i, T) rtol=1e-12
+                end
+
+                mixture = sum(Y[i] * exact(i, T) for i in eachcomponent(td))
+                @test entropy_c_v_integral(u, T, rho, td)≈mixture rtol=1e-12
+            end
+        end
+    end
+
+    @testset "entropy integral: differences over a cell" begin
+        # the entropy-conservative flux only ever uses differences of the integral,
+        # so those must be exact too, including when both ends sit inside one cell
+        for offset in (false, true)
+            td = build_lin(offset)
+            # written without cancellation, unlike evaluating an antiderivative twice
+            exact(i, T_a, T_b) = A_LIN[i] * log(T_b / T_a) + B_LIN[i] * (T_b - T_a)
+
+            for (T_a, T_b) in ((137.3, 142.9), (1234.567, 1234.999),
+                               (462.71, 4321.98), (2999.99, 3000.01))
+                _, _, ic_a, _ = get_index_lower_fracpos(T_a, td)
+                _, _, ic_b, _ = get_index_lower_fracpos(T_b, td)
+                for i in eachcomponent(td)
+                    lower = entropy_c_v_integral_component(i, ic_a, T_a, td)
+                    numeric = entropy_c_v_integral_component(i, ic_b, T_b, td) - lower
+
+                    # subtracting two integrals measured from T_c_arr[1] loses
+                    # digits when the interval is short, so allow for that
+                    @test numeric≈exact(i, T_a, T_b) rtol=1e-11 atol=1e-12 * abs(lower)
+                end
+            end
+        end
+    end
+
+    @testset "entropy integral is second-order accurate in ΔT" begin
+        # with a quadratic c_v the piecewise-linear table is no longer exact;
+        # halving ΔT then has to cut the error by about four
+        T_a, T_b = 462.71, 4321.98
+        exact(i) = (A_LIN[i] * log(T_b / T_a) + B_LIN[i] * (T_b - T_a) +
+                    0.5 * C_QUAD[i] * (T_b^2 - T_a^2))
+
+        for offset in (false, true)
+            errors = map((20.0, 10.0, 5.0, 2.5)) do Δ
+                td = build_quad(offset; step = Δ)
+                _, _, ic_a, _ = get_index_lower_fracpos(T_a, td)
+                _, _, ic_b, _ = get_index_lower_fracpos(T_b, td)
+                maximum(eachcomponent(td)) do i
+                    numeric = entropy_c_v_integral_component(i, ic_b, T_b, td) -
+                              entropy_c_v_integral_component(i, ic_a, T_a, td)
+                    abs(numeric - exact(i)) / abs(exact(i))
+                end
+            end
+
+            @test all(diff(collect(errors)) .< 0.0)
+            for k in 1:(length(errors) - 1)
+                @test 3.5 < errors[k] / errors[k + 1] < 4.5
             end
         end
     end
