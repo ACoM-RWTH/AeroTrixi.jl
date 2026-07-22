@@ -97,7 +97,7 @@
                 e_arr ./= ref_q.e_ref
                 c_v_arr ./= ref_q.c_v_ref
                 int_c_v_over_t_arr ./= ref_q.c_v_ref
-                mass_arr ./= ref_q.m_ref
+                mass_arr = mass_arr ./ ref_q.m_ref
 
                 return new(ref_q,
                         mass_arr,
