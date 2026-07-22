@@ -416,14 +416,19 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
 
     @testset "no mutation of mass_arr" begin
         ref_q = scaled_ref_q()
-        masses_copy = copy(MASSES)
 
-        td = ThermoData1T(ref_q, masses_copy, E_C_FUNS;
-                          T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
-                          cv_table_offset = offset)
+        for offset in (false, true)
+            masses_copy = copy(MASSES)
 
-        @test maximum(abs.(MASSES .- masses_copy)) < 2*eps()
-        @test maximum(abs.(masses_copy .- td.mass)) > 1.0
+            td = ThermoData1T(ref_q, masses_copy, E_C_FUNS;
+                              T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
+                              cv_table_offset = offset)
+
+            # the caller's array must come back untouched, while the stored masses
+            # are scaled by m_ref
+            @test maximum(abs.(MASSES .- masses_copy)) < 2 * eps()
+            @test maximum(abs.(masses_copy .- td.mass)) > 1.0
+        end
     end
 end
 
