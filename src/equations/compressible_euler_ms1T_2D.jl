@@ -170,8 +170,8 @@
             entr_other = SVector{3, real(equations)}(v1*T_inv, v2*T_inv, -T_inv)
             minus_v_half_by_T = -(v1^2 + v2^2)/2*T_inv
 
-            index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T, equations.thermodata)
-            @inbounds entr_rho = SVector{ncomponents(equations.thermodata), real(equations)}(-entropy_c_v_integral_component(i, index_lower_c, fracpos_c, T, equations.thermodata) + log(abs(u[i + 3]))*equations.thermodata.inv_mass[i] + energy_component(i, index_lower_e, fracpos_e, equations.thermodata)/T + minus_v_half_by_T
+            index_lower_e, fracpos_e, index_lower_c, _ = get_index_lower_fracpos(T, equations.thermodata)
+            @inbounds entr_rho = SVector{ncomponents(equations.thermodata), real(equations)}(-entropy_c_v_integral_component(i, index_lower_c, T, equations.thermodata) + log(abs(u[i + 3]))*equations.thermodata.inv_mass[i] + energy_component(i, index_lower_e, fracpos_e, equations.thermodata)/T + minus_v_half_by_T
                                                                         for i in eachcomponent(equations.thermodata))
             return vcat(entr_other, entr_rho)
         end
@@ -188,8 +188,10 @@
         thermodata = equations.thermodata
         # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
         # only for NoCvOffset
-        (ie_ll, fe_ll, ic_ll, fc_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
-        (ie_rr, fe_rr, ic_rr, fc_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
+        # the c_v fractional positions are not needed here: the entropy integral only
+        # takes the cell index, and c_v itself is only evaluated at T_mid below
+        (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll, equations)
+        (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr, equations)
         #rho = density()
 
         # rhos_ll = abs.(rhos_ll)
@@ -219,8 +221,8 @@
             if (abs(T_jump) >= equations.min_T_jump)
                 inv_T_jump = 1.0 / T_jump
                 @inbounds for i in eachcomponent(thermodata)
-                    cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, fc_rr, T_rr, thermodata)
-                                            - entropy_c_v_integral_component(i, ic_ll, fc_ll, T_ll, thermodata)) * inv_T_jump
+                    cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, T_rr, thermodata)
+                                            - entropy_c_v_integral_component(i, ic_ll, T_ll, thermodata)) * inv_T_jump
                     # cv_Tast_over_Tast = (entropy_c_v_integral(i, T_rr, equations)
                     #                      - entropy_c_v_integral(i, T_ll, equations)) * inv_T_jump
 
@@ -263,8 +265,8 @@
                 inv_T_jump = 1.0  / T_jump
                 @inbounds for i in eachcomponent(thermodata)
                     # cv_Tast_over_Tast = (entropy_c_v_integral(i, T_rr, equations) - entropy_c_v_integral(i, T_ll, equations)) * inv_T_jump
-                    cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, fc_rr, T_rr, thermodata)
-                                            - entropy_c_v_integral_component(i, ic_ll, fc_ll, T_ll, thermodata)) * inv_T_jump
+                    cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, T_rr, thermodata)
+                                            - entropy_c_v_integral_component(i, ic_ll, T_ll, thermodata)) * inv_T_jump
 
                     # e_int_ll = energy_component(i, T_ll, equations) 
                     # e_int_rr = energy_component(i, T_rr, equations) 
