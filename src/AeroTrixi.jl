@@ -12,6 +12,8 @@ using Trixi: @printf, @sprintf, print_level_information,
              DiscreteCallback, SolutionAnalyzer,
              create_cache_analysis, summary_box, ncalls,
              AbstractEquations, AbstractEquationsParabolic, AbstractSemidiscretization,
+             AbstractCompressibleEulerMulticomponentEquations,
+             ln_mean,
              mesh_equations_solver_cache, get_tmp_cache,
              wrap_array,
              derivative_discontinuity!, isfinished,
@@ -29,7 +31,8 @@ using Trixi: @printf, @sprintf, print_level_information,
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
-              initialize!
+              initialize!,
+              varnames, cons2entropy, prim2cons, cons2prim, varnames, density
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 

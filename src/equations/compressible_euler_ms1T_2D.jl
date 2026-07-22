@@ -5,7 +5,7 @@
     # the conservative variables are rho v_1, rho v_2, rho e, rho_1, ..., rho_NCOMP
     # the primitive variables are v_1, v_2, T, rho_1, ..., rho_NCOMP
     struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <: 
-        Trixi.AbstractCompressibleEulerMulticomponentEquations{2, NVARS, NCOMP}
+        AbstractCompressibleEulerMulticomponentEquations{2, NVARS, NCOMP}
         # NVARS = NCOMP + 3 (NCOMP eqns for density + 2 for velocity and 1 for energy)
 
         min_T_jump::Float64
@@ -89,6 +89,7 @@
         return energy_total(cons, equations) - energy_kinetic(cons, equations)
     end
 
+    # compute temperature
     @inline function temperature(u, equations::CompressibleEulerEquationsMs1T2D)
         rho = density(u, equations)
         rho_inv = 1.0 / rho
@@ -96,6 +97,7 @@
         return temperature_rho_inv(u, rho_inv, 0.28*eint, eint, equations.thermodata)
     end
 
+    # compute total density and number density 
     @inline function density_and_number_density(u, equations::CompressibleEulerEquationsMs1T2D)
         rho = zero(u[1])
         nrho = zero(u[1])
@@ -108,7 +110,8 @@
         return rho, nrho
     end
 
-    @inline function Trixi.pressure(u, equations::CompressibleEulerEquationsMs1T2D)
+    # compute pressure
+    @inline function pressure(u, equations::CompressibleEulerEquationsMs1T2D)
         rho_v1, rho_v2, rho_e, _ = u
         rho, nrho = density_and_number_density(u, equations)
         rho_inv = 1.0 / rho
@@ -118,7 +121,7 @@
     end
 
     # convert primitive to conservative variables
-    @inline function Trixi.prim2cons(prim, equations::CompressibleEulerEquationsMs1T2D) 
+    @inline function prim2cons(prim, equations::CompressibleEulerEquationsMs1T2D) 
         (v1, v2, T, rhos...) = prim
 
         rho = 0.0
@@ -153,14 +156,14 @@
         return index_lower_e, fracpos_e, index_lower_c, fracpos_c, vcat(prim_other, prim_rho)
     end
 
-    function Trixi.varnames(::typeof(cons2cons),
-                        equations::CompressibleEulerEquationsMs1T2D)
+    function varnames(::typeof(cons2cons),
+                      equations::CompressibleEulerEquationsMs1T2D)
         cons = ("rho_v1", "rho_v2", "rho_e")
         rhos = ntuple(n -> "rho" * string(n), Val(ncomponents(equations.thermodata))) # TODO: pre-alloc?
         return (cons..., rhos...)
     end
 
-    @inline function Trixi.cons2entropy(u, equations::CompressibleEulerEquationsMs1T2D)
+    @inline function cons2entropy(u, equations::CompressibleEulerEquationsMs1T2D)
             rho_v1, rho_v2, _ = u
             rho = density(u, equations)
             v1 = rho_v1 / rho
@@ -180,6 +183,9 @@
         Float64
     end
 
+    # entropy-conservative flux
+    # see Oblapenko, Torrilhon, Computers and Fluids 2025 106640, DOI 10.1016/j.compfluid.2025.106640
+    # and Oblapenko, Tarnovskiy, Ertl, Torrilhon, STAB/DGLR Symposium 2024, DOI 10.1007/978-3-032-11115-9_36
     @inline function flux_oblapenko(u_ll, u_rr, orientation::Integer,
             equations::CompressibleEulerEquationsMs1T2D)
         thermodata = equations.thermodata
@@ -204,7 +210,7 @@
         end
 
         if(orientation == 1)
-            @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(Trixi.ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) * v1_avg
+            @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) * v1_avg
                                                                 for i in eachcomponent(thermodata))  #use ln_mean function in math.jl
             fx_rhos_sum = sum(fx_rhos)                                      
             fx_rho_v1 = v1_avg * fx_rhos_sum  + tmp_sum / inv_T_avg
@@ -235,7 +241,7 @@
                 end
             end
         else
-            @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(Trixi.ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) * v2_avg
+            @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) * v2_avg
                                                                 for i in eachcomponent(thermodata))
             fx_rhos_sum = sum(fx_rhos)                                      
             fx_rho_v2 = v2_avg * fx_rhos_sum  + tmp_sum / inv_T_avg
