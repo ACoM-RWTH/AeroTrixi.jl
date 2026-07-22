@@ -413,6 +413,18 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
                                                  T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
                                                  interpolation = :quadratic)
     end
+
+    @testset "no mutation of mass_arr" begin
+        ref_q = scaled_ref_q()
+        masses_copy = copy(MASSES)
+
+        td = ThermoData1T(ref_q, masses_copy, E_C_FUNS;
+                          T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
+                          cv_table_offset = offset)
+
+        @test maximum(abs.(MASSES .- masses_copy)) < 2*eps()
+        @test maximum(abs.(masses_copy .- td.mass)) > 1.0
+    end
 end
 
 end # module
