@@ -8,8 +8,8 @@ using AeroTrixi: ThermoData1T, ncomponents, eachcomponent,
                  energy_component, c_v_component, energy, c_v,
                  energy_from_rho_vec,
                  entropy_c_v_integral_component, entropy_c_v_integral,
-                 limit_T_low_rhoinv, temperature_rhoinv,
-                 temperature_rhoinv_with_index, get_gamma,
+                 limit_T_low_rho_inv, temperature_rho_inv,
+                 temperature_rho_inv_with_index, get_gamma,
                  ReferenceFlowQuantities, SVector, k_B
 
 # ------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ function reference_indices(T, T_min, ΔT, offset)
 end
 
 # temperatures the solver is allowed to produce, see the clamping in
-# `temperature_rhoinv`
+# `temperature_rho_inv`
 T_lo() = 1.0001 * T_MIN
 T_hi() = 0.9999 * T_MAX
 sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
@@ -185,7 +185,7 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
         end
 
         # exactly at T_max the upper energy stencil runs past the end of the energy
-        # table; this is why `temperature_rhoinv` clamps to 0.9999 * T_max
+        # table; this is why `temperature_rho_inv` clamps to 0.9999 * T_max
         td_no = build(identity_ref_q(), false)
         td_off = build(identity_ref_q(), true)
 
@@ -276,10 +276,10 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
                 # the Newton solve has to recover T from e for any starting guess
                 # inside the tabulated range
                 for T0 in (T, T_lo(), T_hi(), 0.5 * (T_MIN + T_MAX))
-                    @test temperature_rhoinv(u, 1.0 / rho, T0, e, td)≈T rtol=1e-9
+                    @test temperature_rho_inv(u, 1.0 / rho, T0, e, td)≈T rtol=1e-9
                 end
 
-                T_sol, index_e, frac_e, index_c, frac_c = temperature_rhoinv_with_index(u,
+                T_sol, index_e, frac_e, index_c, frac_c = temperature_rho_inv_with_index(u,
                                                                                         1.0 /
                                                                                         rho,
                                                                                         T, e,
@@ -300,8 +300,8 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
                     0.5 * (T_MIN + T_MAX)
 
             # out-of-range initial guesses are clamped, and a scalar is returned
-            T_below = temperature_rhoinv(u, 1.0 / rho, 0.5 * T_MIN, e_mid, td)
-            T_above = temperature_rhoinv(u, 1.0 / rho, 2.0 * T_MAX, e_mid, td)
+            T_below = temperature_rho_inv(u, 1.0 / rho, 0.5 * T_MIN, e_mid, td)
+            T_above = temperature_rho_inv(u, 1.0 / rho, 2.0 * T_MAX, e_mid, td)
             @test T_below isa Float64
             @test T_above isa Float64
             @test T_below ≈ 1.0001 * T_MIN
@@ -309,7 +309,7 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
 
             # the indexed variant clamps to the same temperatures and returns
             # indices consistent with them
-            T_c, index_e, frac_e, index_c, frac_c = temperature_rhoinv_with_index(u,
+            T_c, index_e, frac_e, index_c, frac_c = temperature_rho_inv_with_index(u,
                                                                                   1.0 / rho,
                                                                                   0.5 * T_MIN,
                                                                                   e_mid, td)
@@ -325,12 +325,12 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
             u = state(rho)
             e_min = sum(Y[i] * C_V_TOT[i] * T_MIN for i in eachcomponent(td))
 
-            @test limit_T_low_rhoinv(u, 1.0 / rho, 0.5 * e_min, td)
-            @test limit_T_low_rhoinv(u, 1.0 / rho, e_min, td)
-            @test !limit_T_low_rhoinv(u, 1.0 / rho, 1.5 * e_min, td)
+            @test limit_T_low_rho_inv(u, 1.0 / rho, 0.5 * e_min, td)
+            @test limit_T_low_rho_inv(u, 1.0 / rho, e_min, td)
+            @test !limit_T_low_rho_inv(u, 1.0 / rho, 1.5 * e_min, td)
 
             # an energy below the table minimum is clamped to the lower bound
-            @test temperature_rhoinv(u, 1.0 / rho, 0.5 * (T_MIN + T_MAX), 0.5 * e_min,
+            @test temperature_rho_inv(u, 1.0 / rho, 0.5 * (T_MIN + T_MAX), 0.5 * e_min,
                                      td) ≈ 1.0001 * T_MIN
         end
     end
@@ -387,7 +387,7 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
                 @test c_v(u, 1.0 / rho, index_c, frac_c, td)≈c_v_exact rtol=1e-12
 
                 # inverting the scaled energy has to give back the scaled temperature
-                @test temperature_rhoinv(u, 1.0 / rho, T_scaled, e_exact,
+                @test temperature_rho_inv(u, 1.0 / rho, T_scaled, e_exact,
                                          td)≈T_scaled rtol=1e-9
             end
         end
