@@ -253,7 +253,7 @@ sample_temperatures(n) = range(T_lo(), T_hi(); length = n)
                 _, _, index_c, frac_c = get_index_lower_fracpos(T, td)
 
                 for i in eachcomponent(td)
-                    @test entropy_c_v_integral_component(i, index_c, frac_c, T,
+                    @test entropy_c_v_integral_component(i, index_c, T,
                                                          td)≈C_V_TOT[i] *
                                                              log(T / T_0) rtol=1e-11
                 end

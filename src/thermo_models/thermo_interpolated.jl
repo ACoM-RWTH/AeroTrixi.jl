@@ -279,13 +279,18 @@
     end
 
     # compute ∫ c_v / T dT for a single component using linear interpolation
-    @inline function entropy_c_v_integral_component(i_comp, index_lower_c, fracpos_c, T_b, thermodata::ThermoData1T{LinearInterpolation, CvO, NCOMP}) where {CvO, NCOMP}
+    # ∫ c_v / T dT = ∫_T0^T_a c_v / T dT + ∫_T_a^T_b c_v / T dT
+    # where T_b is the current temperature, T_a is the closest tabulated temperature s.t. T_a < T_b
+    # ∫_T0^T_a c_v / T dT - via look-up table
+    # c_v(T) in interval is linear: c_v(T) = c_v_a + (c_v_n - c_v_a) * (T - T_a) / ΔT
+    # c_v_n - c_v(T_a + dT) - next tabulated value
+    @inline function entropy_c_v_integral_component(i_comp, index_lower_c, T_b, thermodata::ThermoData1T{LinearInterpolation, CvO, NCOMP}) where {CvO, NCOMP}
         @inbounds T_a = thermodata.T_c_arr[index_lower_c]
         @inbounds T_a_inv = thermodata.T_c_arr_inv[index_lower_c]
 
-        c_v_b = c_v_component(i_comp, index_lower_c, fracpos_c, thermodata)  # value of c_v at T
         @inbounds c_v_a = thermodata.c_v_arr[index_lower_c, i_comp]    # value of c_v at closest_T
-        integrate_part = (c_v_a - (c_v_b - c_v_a) * T_a * thermodata.inv_ΔT) * log(T_b * T_a_inv) + (c_v_b - c_v_a)
+        @inbounds slope = (thermodata.c_v_arr[index_lower_c + 1, i_comp] - c_v_a) * thermodata.inv_ΔT
+        integrate_part = (c_v_a - slope * T_a) * log(T_b * T_a_inv) + slope * (T_b - T_a)
 
         @inbounds return thermodata.int_c_v_over_t_arr[index_lower_c, i_comp] + integrate_part
     end
@@ -294,9 +299,9 @@
     @inline function entropy_c_v_integral(u, T, rho, thermodata::ThermoData1T)
         result = 0.0
 
-        _, _, index_lower_c, fracpos_c = get_index_lower_fracpos(T, thermodata)
+        _, _, index_lower_c, _ = get_index_lower_fracpos(T, thermodata)
         @inbounds for i in eachcomponent(thermodata)
-            result += entropy_c_v_integral_component(i, index_lower_c, fracpos_c, T, thermodata) * u[i + 3] / rho
+            result += entropy_c_v_integral_component(i, index_lower_c, T, thermodata) * u[i + 3] / rho
         end
         return result
     end
