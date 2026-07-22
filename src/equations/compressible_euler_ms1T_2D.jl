@@ -1,4 +1,9 @@
 @muladd begin
+    # compressible Euler equations for 2D multi-species flows with 1 temperature
+    # (thermal equilibrium)
+    # with interpolation for thermodynamic data stored in a ThermoData1T{I, CvO, NCOMP} instance
+    # the conservative variables are rho v_1, rho v_2, rho e, rho_1, ..., rho_NCOMP
+    # the primitive variables are v_1, v_2, T, rho_1, ..., rho_NCOMP
     struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <: 
         Trixi.AbstractCompressibleEulerMulticomponentEquations{2, NVARS, NCOMP}
         # NVARS = NCOMP + 3 (NCOMP eqns for density + 2 for velocity and 1 for energy)
@@ -34,7 +39,10 @@
 
             if interpolation == :linear
                 if cv_table_offset == true
-                    error("Offset of c_v(T) not implemented")
+                    return CompressibleEulerEquationsMs1T2D{LinearInterpolation, CvOffset, NVARS, NCOMP}(
+                        ref_q, mass_arr, e_int_function, c_int_function;
+                        min_T_jump=min_T_jump, T_min=T_min, T_max=T_max, T_tol=T_tol, ΔT=ΔT
+                    )
                 else
                     return CompressibleEulerEquationsMs1T2D{LinearInterpolation, NoCvOffset, NVARS, NCOMP}(
                         ref_q, mass_arr, e_int_function, c_int_function;
@@ -47,9 +55,8 @@
         end
     end
 
-
     @inline function density(u, equations::CompressibleEulerEquationsMs1T2D)
-        rho = zero(u[1])
+        @inbounds rho = zero(u[1])
 
         @inbounds for i in eachcomponent(equations.thermodata)
             rho += u[i + 3]
@@ -59,17 +66,15 @@
     end
 
     # Calculate total energy for a conservative state `cons`
-    @inline energy_total(cons, ::CompressibleEulerEquationsMs1T2D) = cons[3]  #so rhis is just rho_e?    
+    @inline energy_total(cons, ::CompressibleEulerEquationsMs1T2D) = cons[3]
 
     # Calculate kinetic energy for a conservative state `cons`
     @inline function energy_kinetic(u, rho, equations::CompressibleEulerEquationsMs1T2D)
         rho_v1, rho_v2, _ = u
-        #rho = density(u, equations)
         return (rho_v1^2 + rho_v2^2) / (2 * rho)
     end
 
     @inline function energy_kinetic(u, equations::CompressibleEulerEquationsMs1T2D)
-        #  rho_v1, rho_v2, rho_e = u
         rho = density(u, equations)
         return energy_kinetic(u, rho, equations)#(rho_v1^2 + rho_v2^2) / (2 * rho)
     end
@@ -86,8 +91,9 @@
 
     @inline function temperature(u, equations::CompressibleEulerEquationsMs1T2D)
         rho = density(u, equations)
-        eint = energy_internal(u, equations) / rho
-        return temperature_rhoinv(u, 1.0/rho, 0.28*eint, eint, equations.thermodata)
+        rho_inv = 1.0 / rho
+        eint = energy_internal(u, equations) * rho_inv
+        return temperature_rho_inv(u, rho_inv, 0.28*eint, eint, equations.thermodata)
     end
 
     @inline function density_and_number_density(u, equations::CompressibleEulerEquationsMs1T2D)
@@ -105,17 +111,15 @@
     @inline function Trixi.pressure(u, equations::CompressibleEulerEquationsMs1T2D)
         rho_v1, rho_v2, rho_e, _ = u
         rho, nrho = density_and_number_density(u, equations)
-        invrho = 1.0 / rho
-        e_internal = (rho_e - 0.5 * (rho_v1^2 + rho_v2^2) * invrho) * invrho
-        p = temperature_rhoinv(u, invrho, 0.28*e_internal, e_internal, equations.thermodata) * nrho
+        rho_inv = 1.0 / rho
+        e_internal = (rho_e - 0.5 * (rho_v1^2 + rho_v2^2) * rho_inv) * rho_inv
+        p = temperature_rho_inv(u, rho_inv, 0.28*e_internal, e_internal, equations.thermodata) * nrho
         return p
     end
 
-
-
+    # convert primitive to conservative variables
     @inline function Trixi.prim2cons(prim, equations::CompressibleEulerEquationsMs1T2D) 
         (v1, v2, T, rhos...) = prim
-        # rho=sum(rhos)
 
         rho = 0.0
         @inbounds for i in eachcomponent(equations.thermodata)
@@ -123,11 +127,9 @@
         end
         rho_v1 = rho * v1
         rho_v2 = rho * v2
-        # rho_e = rho * energy_from_rho_vec(rhos, rho, T, equations) + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
         rho_e = rho * energy_from_rho_vec(rhos, rho, T, equations.thermodata) + 0.5 * (rho_v1 * v1 + rho_v2 * v2)
         return SVector(rho_v1, rho_v2, rho_e, rhos...)
     end
-
 
     # Convert conservative variables to primitive
     @inline function cons2prim_with_index(u, equations::CompressibleEulerEquationsMs1T2D)
@@ -143,8 +145,7 @@
 
         e_internal = (rho_e - 0.5 * (rho_v1 * v1 + rho_v2 * v2)) * rho_inv
 
-
-        T, index_lower, fracpos = temperature_rhoinv_with_index(u, rho_inv, 0.28*e_internal, e_internal, equations.thermodata)
+        T, index_lower, fracpos = temperature_rho_inv_with_index(u, rho_inv, 0.28*e_internal, e_internal, equations.thermodata)
         prim_other = SVector{3, Float64}(v1, v2, T)
 
         return index_lower, fracpos, vcat(prim_other, prim_rho)
@@ -158,20 +159,15 @@
     end
 
     @inline function Trixi.cons2entropy(u, equations::CompressibleEulerEquationsMs1T2D)
-            #energy(i, T, equations
-            #ncomponents(equations)
-            rho_v1, rho_v2, rho_e = u
-            #prim_rho = SVector{ncomponents(equations), real(equations)}(u[i + 3]
-            #                                                            for i in eachcomponent(equations))
-            #rho, nrho = density(u, equations)
+            rho_v1, rho_v2, _ = u
             rho = density(u, equations)
             v1 = rho_v1 / rho
             v2 = rho_v2 / rho
             T = temperature(u, equations)
-            entr_other = SVector{3, real(equations)}(v1/T, v2/T, -1/T)
-            minus_v_half_by_T = -(v1^2 + v2^2)/2/T
-            # entr_rho = SVector{ncomponents(equations), real(equations)}(-entropy_c_v_integral(i, T,equations) + log(u[i + 3])/equations.mass[i] + energy_component(i, T, equations)/T + minus_v_half_by_T
-            #                                                             for i in eachcomponent(equations))
+            T_inv = 1/T
+            entr_other = SVector{3, real(equations)}(v1*T_inv, v2*T_inv, -T_inv)
+            minus_v_half_by_T = -(v1^2 + v2^2)/2*T_inv
+
             index_lower, fracpos = get_index_lower_fracpos(T, equations.thermodata)
             @inbounds entr_rho = SVector{ncomponents(equations.thermodata), real(equations)}(-entropy_c_v_integral_component(i, index_lower, fracpos, T, equations.thermodata) + log(abs(u[i + 3]))*equations.thermodata.inv_mass[i] + energy_component(i, index_lower, fracpos, equations.thermodata)/T + minus_v_half_by_T
                                                                         for i in eachcomponent(equations.thermodata))
@@ -182,8 +178,6 @@
                                                                                             NCOMP}
         Float64
     end
-
-
 
     @inline function flux_oblapenko(u_ll, u_rr, orientation::Integer,
             equations::CompressibleEulerEquationsMs1T2D)
@@ -210,12 +204,6 @@
         @inbounds for i in eachcomponent(thermodata)
             tmp_sum = tmp_sum + 0.5*((abs(rhos_ll[i])+abs(rhos_rr[i]))*thermodata.inv_mass[i])
         end
-
-        # il_ll, fp_ll = get_index_lower_fracpos(T_ll, equations)
-        # il_rr, fp_rr = get_index_lower_fracpos(T_rr, equations)
-        # energy_component(i, index_lower, fracpos, equations)
-        # entropy_c_v_integral(i::Int64, index_lower, fracpos, T_b, equations::CompressibleEulerEquationsMs1T2D)
-        # function c_v(i, index_lower, fracpos, equations::CompressibleEulerEquationsMs1T2D)
 
         if(orientation == 1)
             @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(Trixi.ln_mean(abs(rhos_ll[i]), abs(rhos_rr[i])) * v1_avg
