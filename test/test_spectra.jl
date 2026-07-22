@@ -149,8 +149,10 @@ end
         ve = generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_DISS)
 
         # every level is equally populated in the infinite temperature limit
+        # Z -> n_levels
         @test Z_vibr(ve, 1e12)≈length(ve) rtol=1e-6
         # only the ground level is populated as T -> 0
+        # Z -> 1.0
         @test Z_vibr(ve, 1e-3) ≈ 1.0
 
         # averaging a constant returns that constant
@@ -158,7 +160,7 @@ end
             @test avg_over_vibr_array(ve, fill(3.5, length(ve)), T) ≈ 3.5
         end
 
-        # the average sits between the lowest and the highest level
+        # the average energy sits between the lowest and the highest level
         for T in TEMPERATURES
             avg = avg_over_vibr_array(ve, ve, T)
             @test ve[1] <= avg <= ve[end]
