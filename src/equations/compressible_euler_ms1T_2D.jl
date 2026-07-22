@@ -1,10 +1,83 @@
 @muladd begin
-    # compressible Euler equations for 2D multi-species flows with 1 temperature
-    # (thermal equilibrium)
-    # with interpolation for thermodynamic data stored in a ThermoData1T{I, CvO, NCOMP} instance
-    # the conservative variables are rho v_1, rho v_2, rho e, rho_1, ..., rho_NCOMP
-    # the primitive variables are v_1, v_2, T, rho_1, ..., rho_NCOMP
-    struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <: 
+    @doc raw"""
+        CompressibleEulerEquationsMs1T2D(ref_q, mass_arr, e_int_function, c_int_function;
+                                         T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
+                                         ΔT = 1.0, min_T_jump = 1e-6,
+                                         interpolation = :linear, cv_table_offset = false)
+
+    Multicomponent compressible Euler equations in two space dimensions for a flow in
+    thermal equilibrium, i.e. a single temperature ``T`` shared by all degrees of
+    freedom of all species:
+    ```math
+    \frac{\partial}{\partial t}
+    \begin{pmatrix}
+    \rho v_1 \\ \rho v_2 \\ \rho e_{\text{total}} \\ \rho_1 \\ \vdots \\ \rho_{n}
+    \end{pmatrix}
+    +
+    \frac{\partial}{\partial x}
+    \begin{pmatrix}
+    \rho v_1^2 + p \\ \rho v_1 v_2 \\ ( \rho e_{\text{total}} + p) v_1 \\ \rho_1 v_1 \\ \vdots \\ \rho_{n} v_1
+    \end{pmatrix}
+    +
+    \frac{\partial}{\partial y}
+    \begin{pmatrix}
+    \rho v_1 v_2 \\ \rho v_2^2 + p \\ ( \rho e_{\text{total}} + p) v_2 \\ \rho_1 v_2 \\ \vdots \\ \rho_{n} v_2
+    \end{pmatrix}
+    =
+    \begin{pmatrix}
+    0 \\ 0 \\ 0 \\ 0 \\ \vdots \\ 0
+    \end{pmatrix}
+    ```
+    Here ``\rho_i`` is the density of species ``i``, ``\rho = \sum_{i=1}^n \rho_i``,
+    ``v_1``, ``v_2`` the velocities and ``e_{\text{total}}`` the specific total energy.
+    Unlike a calorically perfect gas there is no constant ``\gamma``: the pressure follows
+    from the number density rather than from the internal energy,
+    ```math
+    p = n k_B T, \qquad n = \sum_{i=1}^{n} \frac{\rho_i}{m_i}
+    ```
+    and the internal energy is tabulated,
+    ```math
+    \rho e_{\text{total}} = \sum_{i=1}^{n} \rho_i e_i(T) + \frac{1}{2} \rho (v_1^2 + v_2^2)
+    ```
+    with ``e_i(T)`` carrying the translational, rotational and vibrational contributions
+    of species ``i``. Recovering ``T`` from ``e`` therefore requires a Newton iteration
+    against the tables, which are held in a [`ThermoData1T`](@ref) instance in the
+    `thermodata` field.
+
+    The conservative variables are ``(\rho v_1, \rho v_2, \rho e_{\text{total}},
+    \rho_1, \ldots, \rho_n)`` — note that the momenta come first, there is no ``\rho``
+    entry — and the primitive variables are ``(v_1, v_2, T, \rho_1, \ldots, \rho_n)``,
+    with ``T`` in place of the pressure.
+
+    All quantities are non-dimensionalised by `ref_q`, so ``k_B = 1`` in the equations
+    as implemented and ``p = n T``.
+
+    `flux_oblapenko` is an entropy-conservative two-point flux for this system,
+    available for both an `orientation` and a `normal_direction`.
+
+    # Arguments
+    - `ref_q`: `ReferenceFlowQuantities` (see FlowRef.jl) used to scale every quantity.
+    - `mass_arr`: species masses in kg. Not modified.
+    - `e_int_function`, `c_int_function`: one callable of `T` per species returning the
+      specific internal energy and specific heat of the *internal* degrees of freedom;
+      the translational parts are added internally by [`ThermoData1T`](@ref).
+    - `T_min`, `T_max`, `ΔT`: tabulation range and step, in K. Temperatures are clamped
+      to ``[1.0001\,T_{\min},\; 0.9999\,T_{\max}]``.
+    - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
+    - `min_T_jump`: in units of `ΔT`. Below this temperature jump `flux_oblapenko`
+      replaces its divided differences by the equivalent midpoint expressions, which
+      avoids the ``0/0`` as ``T_{rr} \to T_{ll}``.
+    - `interpolation`: only `:linear` is implemented.
+    - `cv_table_offset`: tabulate ``c_v`` on a grid shifted by ``-\Delta T/2``, see
+      [`ThermoData1T`](@ref).
+
+    # References
+    - Oblapenko, Torrilhon (2025). Computers and Fluids, 106640.
+      [DOI: 10.1016/j.compfluid.2025.106640](https://doi.org/10.1016/j.compfluid.2025.106640)
+    - Oblapenko, Tarnovskiy, Ertl, Torrilhon (2024). STAB/DGLR Symposium.
+      [DOI: 10.1007/978-3-032-11115-9_36](https://doi.org/10.1007/978-3-032-11115-9_36)
+    """
+    struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
         AbstractCompressibleEulerMulticomponentEquations{2, NVARS, NCOMP}
         # NVARS = NCOMP + 3 (NCOMP eqns for density + 2 for velocity and 1 for energy)
 
@@ -607,7 +680,7 @@
     
     """
         boundary_condition_slip_wall(u_inner, orientation, direction, x, t,
-                                     surface_flux_function, equations::CompressibleEulerEquations2D)
+                                     surface_flux_function, equations::CompressibleEulerEquationsMs1T2D)
     
     Should be used together with [`TreeMesh`](@ref).
     """
@@ -631,7 +704,7 @@
     
     """
         boundary_condition_slip_wall(u_inner, normal_direction, direction, x, t,
-                                     surface_flux_function, equations::CompressibleEulerEquations2D)
+                                     surface_flux_function, equations::CompressibleEulerEquationsMs1T2D)
     
     Should be used together with [`StructuredMesh`](@ref).
     """

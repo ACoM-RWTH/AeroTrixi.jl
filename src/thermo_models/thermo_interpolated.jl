@@ -1,13 +1,57 @@
 @muladd begin
-    # store interpolation tables
-    # for internal energies and specific heats
-    # assuming thermal equilibrium (one-temperature approximation)
-    # NCOMP - number of flow components
-    # energy values are stored in temperature range of [T_min_E, T_max_E] with step size ΔT
-    # specific heat values are stored in temperature range of [T_min_c_v, T_max_c_v] with step size ΔT
-    # species' atomic/molecular masses and their inverses are stored in the `mass` array
-    # ALL quantities are stored in dimensionless, with scaling provided via a ReferenceFlowQuantities instance
-    # T_tol sets the tolerance for the Newton solver for T(e)
+    @doc raw"""
+        ThermoData1T(ref_q, mass_arr, e_c_int_function_arr;
+                     T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, ΔT = 1.0,
+                     interpolation = :linear, cv_table_offset = false)
+
+    Tabulated thermodynamic data for a flow of `NCOMP` species in thermal equilibrium,
+    i.e. a single temperature ``T`` shared by all degrees of freedom.
+
+    For each species ``i`` the specific internal energy and the specific heat at constant
+    volume are split into a translational part, which is added internally, and a part
+    carrying the internal degrees of freedom, which is supplied by the caller:
+    ```math
+    e_i(T) = \frac{3}{2} \frac{k_B T}{m_i} + e_i^{\text{int}}(T),
+    \qquad
+    c_{v,i}(T) = \frac{3}{2} \frac{k_B}{m_i} + c_{v,i}^{\text{int}}(T)
+    ```
+    Both are sampled on a uniform grid of step ``\Delta T`` and evaluated by linear
+    interpolation. The entropy integral
+    ```math
+    \int_{T_0}^{T} \frac{c_{v,i}(\tau)}{\tau} \, \mathrm{d}\tau
+    ```
+    is accumulated over the tabulation points and completed with an exact partial-cell
+    contribution, ``T_0`` being the first point of the ``c_v`` grid.
+
+    The energy table holds ``N_T`` points at ``T_{\min} + (i-1)\Delta T``. Where the
+    ``c_v`` table lives is set by `cv_table_offset`:
+
+    - `false` ([`NoCvOffset`](@ref)): the same grid as the energy table.
+    - `true` ([`CvOffset`](@ref)): a grid shifted by ``-\Delta T/2``, i.e.
+      ``T_{\min} - \Delta T/2 + (i-1)\Delta T`` with ``N_T + 2`` points. The two extra
+      points keep ``[T_{\min}, T_{\max}]`` strictly bracketed. Sampling ``c_v`` at cell
+      midpoints makes it consistent with the slope of the piecewise-linear energy.
+
+    Both index pairs are returned together by `get_index_lower_fracpos`; with an
+    offset table they differ, and mixing them up is silently wrong.
+
+    ``T(e)`` is inverted by a Newton iteration with tolerance `T_tol`, clamped to
+    ``[1.0001\,T_{\min},\; 0.9999\,T_{\max}]``.
+
+    All stored quantities are dimensionless, scaled by the `ReferenceFlowQuantities`
+    instance `ref_q`, which is retained in the `ref_q` field.
+
+    # Arguments
+    - `ref_q`: `ReferenceFlowQuantities` used to non-dimensionalise every table.
+    - `mass_arr`: species masses in kg. Not modified.
+    - `e_c_int_function_arr`: one callable per species, `(m, T_e, T_c) -> (e, c_v)`,
+      returning the internal-degree-of-freedom contributions only. The translational
+      parts must *not* be included.
+    - `T_min`, `T_max`, `ΔT`: tabulation range and step, in K.
+    - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
+    - `interpolation`: only `:linear` is implemented.
+    - `cv_table_offset`: place ``c_v`` on the midpoint grid, see above.
+    """
     struct ThermoData1T{I<:Interpolation, CvO<:CvTableOffset, NCOMP} <: ThermoData
         ref_q::ReferenceFlowQuantities
         
