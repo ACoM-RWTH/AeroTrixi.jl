@@ -41,7 +41,7 @@ import Trixi: pretty_form_ascii, pretty_form_utf,
               entropy, entropy_math, entropy_thermodynamic,
               ncomponents, eachcomponent,
               flux, max_abs_speed, max_abs_speeds,
-              boundary_condition_slip_wall
+              boundary_condition_slip_wall, rotate_to_x, rotate_from_x
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
