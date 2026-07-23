@@ -11,7 +11,7 @@ using AeroTrixi: CompressibleEulerEquationsMs1T2D, ReferenceFlowQuantities, k_B,
                  cons2prim_with_index, get_index_lower_fracpos, get_gamma,
                  energy_internal, energy_kinetic, flux_oblapenko, SVector
 
-using Trixi: entropy, entropy_math, entropy_thermodynamic, cons2entropy
+using Trixi: entropy, entropy_math, entropy_thermodynamic, cons2entropy, total_entropy
 
 # ------------------------------------------------------------------------------
 # Two-species O2 / O flow in thermal equilibrium.
@@ -348,6 +348,49 @@ end
                 f_ref = flux_chandrashekar(u_ll, u_rr, orientation, eq_ref_mc)
                 @test f_ms≈f_ref rtol=1e-11
             end
+        end
+    end
+
+    # --------------------------------------------------------------------------
+    # For a calorically perfect gas the entropy variables and the total entropy
+    # must match those of Trixi's `CompressibleEulerMulticomponentEquations2D`.
+    #
+    # Our `int c_v / T dT` is measured from T_c_arr[1] = T_min (scaled), so the
+    # density entropy variables and the total entropy carry a reference constant
+    # `c_v_i * log(T_min_scaled)`. Choosing T_min = 1 (with T_ref = 1) sets that to
+    # zero, so the match is exact rather than up to a per-species constant.
+    # --------------------------------------------------------------------------
+    @testset "constant c_v matches multicomponent entropy" begin
+        m1, m2 = k_B, 2 * k_B
+        ref_q_unit = ReferenceFlowQuantities(1.0, 1.0, 1.0, 1.0, 1.0 / k_B, k_B,
+                                             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+        e_int_1(T) = 1.0 * T
+        c_int_1(T) = 1.0
+        e_int_2(T) = 0.0 * T
+        c_int_2(T) = 0.0
+        cv1, cv2 = 2.5, 0.75
+        gamma1, gamma2 = 1.4, 5 / 3
+        R1, R2 = 1.0, 0.5
+
+        eq_ms = CompressibleEulerEquationsMs1T2D(ref_q_unit, [m1, m2],
+                                                 [e_int_1, e_int_2], [c_int_1, c_int_2];
+                                                 T_min = 1.0, T_max = 10001.0, ΔT = 10.0,
+                                                 min_T_jump = 1e-9)
+        eq_ref = CompressibleEulerMulticomponentEquations2D(gammas = (gamma1, gamma2),
+                                                            gas_constants = (R1, R2))
+
+        function ms_state(T, v1, v2, rhos, cvs)
+            rho = sum(rhos)
+            rho_e = sum(rhos .* cvs) * T + 0.5 * rho * (v1^2 + v2^2)
+            return SVector(rho * v1, rho * v2, rho_e, rhos...)
+        end
+
+        for (T, v1, v2, rhos) in ((2000.0, 0.3, -0.2, (0.7, 0.5)),
+                                  (6000.0, 0.1, 0.4, (0.9, 0.3)),
+                                  (9000.5, -0.25, 0.15, (0.4, 0.8)))
+            u = ms_state(T, v1, v2, rhos, (cv1, cv2))
+            @test cons2entropy(u, eq_ms)≈cons2entropy(u, eq_ref) rtol=1e-11
+            @test entropy(u, eq_ms)≈total_entropy(u, eq_ref) rtol=1e-11
         end
     end
 end
