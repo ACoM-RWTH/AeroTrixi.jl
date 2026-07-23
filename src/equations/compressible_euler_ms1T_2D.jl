@@ -617,6 +617,42 @@
         return max(abs(v_ll) + c_ll * norm_norm, abs(v_rr) + c_rr * norm_norm)
     end
 
+    # Called inside `FluxRotated` in `numerical_fluxes.jl` so the direction
+    # has been normalized prior to this rotation of the state vector
+    @inline function rotate_to_x(u, normal_vector, equations::CompressibleEulerEquationsMs1T2D)
+        # cos and sin of the angle between the x-axis and the normalized normal_vector are
+        # the normalized vector's x and y coordinates respectively (see unit circle).
+        c = normal_vector[1]
+        s = normal_vector[2]
+    
+        # Apply the 2D rotation matrix with normal and tangent directions of the form
+        # [ 1    0    0   0;
+        #   0   n_1  n_2  0;
+        #   0   t_1  t_2  0;
+        #   0    0    0   1 ]
+        # where t_1 = -n_2 and t_2 = n_1
+        densities = @view u[4:end]
+    
+        return SVector(c * u[1] + s * u[2],
+                       -s * u[1] + c * u[2],
+                       u[3],
+                       densities...)
+    end
+    
+    # Called inside `FluxRotated` in `numerical_fluxes.jl` so the direction
+    # has been normalized prior to this back-rotation of the state vector
+    @inline function rotate_from_x(u, normal_vector,
+                                   equations::CompressibleEulerEquationsMs1T2D)
+        c = normal_vector[1]
+        s = normal_vector[2]
+        densities = @view u[4:end]
+    
+        return SVector(c * u[1] - s * u[2],
+                       s * u[1] + c * u[2],
+                       u[3],
+                       densities...)
+    end
+
     @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
                                                   x, t,
                                                   surface_flux_function,
