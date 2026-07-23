@@ -322,7 +322,9 @@
             minus_v_half_by_T = -(v1^2 + v2^2)/2*T_inv
 
             index_lower_e, fracpos_e, index_lower_c, _ = get_index_lower_fracpos(T, equations.thermodata)
-            @inbounds entr_rho = SVector{ncomponents(equations.thermodata), real(equations)}(-entropy_c_v_integral_component(i, index_lower_c, T, equations.thermodata) + log(abs(u[i + 3]))*equations.thermodata.inv_mass[i] + energy_component(i, index_lower_e, fracpos_e, equations.thermodata)/T + minus_v_half_by_T
+            # the `(log(rho_i) + 1) * inv_mass_i` matches d/d(rho_i) of the rho_i log(rho_i)
+            # term in `entropy_math`, so these are exactly the gradient of `entropy`
+            @inbounds entr_rho = SVector{ncomponents(equations.thermodata), real(equations)}(-entropy_c_v_integral_component(i, index_lower_c, T, equations.thermodata) + (log(abs(u[i + 3])) + 1.0)*equations.thermodata.inv_mass[i] + energy_component(i, index_lower_e, fracpos_e, equations.thermodata)/T + minus_v_half_by_T
                                                                         for i in eachcomponent(equations.thermodata))
             return vcat(entr_other, entr_rho)
         end

@@ -11,6 +11,8 @@ using AeroTrixi: CompressibleEulerEquationsMs1T2D, ReferenceFlowQuantities, k_B,
                  cons2prim_with_index, get_index_lower_fracpos, get_gamma,
                  energy_internal, energy_kinetic, flux_oblapenko, SVector
 
+using Trixi: entropy, entropy_math, entropy_thermodynamic, cons2entropy
+
 # ------------------------------------------------------------------------------
 # Two-species O2 / O flow in thermal equilibrium.
 #
@@ -198,6 +200,73 @@ end
         u = scaled_cons(4003.5, -600.0, 780.0, 22222.0, 0.35)
         @test flux_oblapenko(u, u, 1, EQUATIONS)≈flux(u, 1, EQUATIONS) atol=1e-10
         @test flux_oblapenko(u, u, 2, EQUATIONS)≈flux(u, 2, EQUATIONS) atol=1e-10
+    end
+
+    # --------------------------------------------------------------------------
+    # Entropy variables and entropy conservation. `cons2entropy` is the gradient of
+    # `entropy`, and `flux_oblapenko` conserves that entropy.
+    # --------------------------------------------------------------------------
+    @testset "entropy variables and conservation" begin
+        states = (scaled_cons(2000.0, 0.3, -0.2, 20000.0, 0.35),
+                  scaled_cons(6000.0, 0.1, 0.4, 15000.0, 0.55),
+                  scaled_cons(9000.5, -0.25, 0.15, 30000.0, 0.5))
+
+        @testset "wrapper consistency" begin
+            for u in states
+                rho = density(u, EQUATIONS)
+                @test entropy(u, EQUATIONS) == entropy_math(u, EQUATIONS)
+                @test entropy_math(u, EQUATIONS)≈-rho *
+                                                 entropy_thermodynamic(u, EQUATIONS) rtol=1e-13
+                @test entropy_thermodynamic(u, EQUATIONS)≈entropy_thermodynamic(u, rho,
+                                                                                EQUATIONS) rtol=1e-13
+            end
+        end
+
+        @testset "momentum and energy entropy variables" begin
+            # the first three entropy variables are exactly (v1/T, v2/T, -1/T)
+            for u in states
+                w = cons2entropy(u, EQUATIONS)
+                _, _, _, _, prim = cons2prim_with_index(u, EQUATIONS)
+                v1, v2, T = prim[1], prim[2], prim[3]
+                @test w[1]≈v1 / T rtol=1e-11
+                @test w[2]≈v2 / T rtol=1e-11
+                @test w[3]≈-1 / T rtol=1e-11
+            end
+        end
+
+        @testset "cons2entropy is the gradient of the entropy" begin
+            basis(i) = SVector{5}(ntuple(k -> k == i ? 1.0 : 0.0, 5))
+            for u in states
+                grad = SVector{5}(ntuple(5) do i
+                    h = 1e-6 * max(abs(u[i]), 1.0)
+                    (entropy(u + h * basis(i), EQUATIONS) -
+                     entropy(u - h * basis(i), EQUATIONS)) / (2h)
+                end)
+                @test cons2entropy(u, EQUATIONS)≈grad rtol=1e-5
+            end
+        end
+
+        @testset "flux_oblapenko is entropy conservative" begin
+            # Tadmor condition: (w_ll - w_rr) . f* = psi_ll - psi_rr, with the
+            # entropy-flux potential psi_j = w . f_phys_j - v_j * entropy
+            function psi(u, orientation)
+                rho = density(u, EQUATIONS)
+                v = orientation == 1 ? u[1] / rho : u[2] / rho
+                return sum(cons2entropy(u, EQUATIONS) .* flux(u, orientation, EQUATIONS)) -
+                       v * entropy(u, EQUATIONS)
+            end
+
+            pairs = ((states[1], states[2]),  # large temperature jump
+                     (states[2], states[3]),
+                     (states[1], states[1] .* 1.0000003))  # tiny jump, midpoint branch
+            for (u_ll, u_rr) in pairs, orientation in (1, 2)
+                fstar = flux_oblapenko(u_ll, u_rr, orientation, EQUATIONS)
+                lhs = sum((cons2entropy(u_ll, EQUATIONS) .- cons2entropy(u_rr, EQUATIONS)) .*
+                          fstar)
+                rhs = psi(u_ll, orientation) - psi(u_rr, orientation)
+                @test lhs≈rhs atol=1e-9
+            end
+        end
     end
 
     # --------------------------------------------------------------------------
