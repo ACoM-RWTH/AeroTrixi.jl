@@ -4,4 +4,3 @@ AeroTrixi = "96ec6574-3e85-11f1-3b3c-2957db4b7004"
 
 [compat]
 Documenter = "1.11"
-AeroTrixi = "0.2"
