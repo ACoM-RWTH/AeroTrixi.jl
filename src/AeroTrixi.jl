@@ -48,6 +48,7 @@ include("semidiscretization/semidiscretization_hyperbolic.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        AnalysisCallback,
+       AeroBoundaryConditions,
        examples_dir
 
 end

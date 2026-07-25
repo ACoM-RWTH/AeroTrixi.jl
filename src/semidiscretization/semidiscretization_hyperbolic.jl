@@ -1,14 +1,25 @@
-function Trixi.digest_boundary_conditions(boundary_conditions::NamedTuple,
+"""
+    AeroBoundaryConditions
+
+Wrapper for `boundary_conditions::NamedTuple` to avoid type piracy.
+"""
+struct AeroBoundaryConditions
+    boundary_conditions::NamedTuple
+end
+
+function Trixi.digest_boundary_conditions(aero_boundary_conditions::AeroBoundaryConditions,
                                           mesh::Union{P4estMesh{2}, P4estMeshView{2},
                                                       UnstructuredMesh2D,
                                                       T8codeMesh{2}},
                                           solver, cache)
+    @unpack boundary_conditions = aero_boundary_conditions
     return AeroUnstructuredSortedBoundaryTypes(boundary_conditions, cache)
 end
 
-function Trixi.digest_boundary_conditions(boundary_conditions::NamedTuple,
+function Trixi.digest_boundary_conditions(aero_boundary_conditions::AeroBoundaryConditions,
                                           mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                           solver, cache)
+    @unpack boundary_conditions = aero_boundary_conditions
     return AeroUnstructuredSortedBoundaryTypes(boundary_conditions, cache)
 end
 
@@ -28,19 +39,21 @@ end
 
 # allow passing a single BC that get converted into a named tuple of BCs
 # on (mapped) hypercube domains
-function Trixi.digest_boundary_conditions(boundary_conditions,
+function Trixi.digest_boundary_conditions(aero_boundary_conditions::Function,
                                           mesh::Union{P4estMesh{2}, P4estMeshView{2},
                                                       UnstructuredMesh2D,
                                                       T8codeMesh{2}},
                                           solver, cache)
+    @unpack boundary_conditions = aero_boundary_conditions
     bcs = (; x_neg = boundary_conditions, x_pos = boundary_conditions,
            y_neg = boundary_conditions, y_pos = boundary_conditions)
     return AeroUnstructuredSortedBoundaryTypes(bcs, cache)
 end
 
-function Trixi.digest_boundary_conditions(boundary_conditions,
+function Trixi.digest_boundary_conditions(aero_boundary_conditions::Function,
                                           mesh::Union{P4estMesh{3}, T8codeMesh{3}},
                                           solver, cache)
+    @unpack boundary_conditions = aero_boundary_conditions
     bcs = (; x_neg = boundary_conditions, x_pos = boundary_conditions,
            y_neg = boundary_conditions, y_pos = boundary_conditions,
            z_neg = boundary_conditions, z_pos = boundary_conditions)
