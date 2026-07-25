@@ -23,7 +23,7 @@ mutable struct AeroUnstructuredSortedBoundaryTypes{N, BCs <: NTuple{N, Any},
 end
 
 # constructor that "eats" the original boundary condition NamedTuple and sorts the information
-# from the `UnstructuredBoundaryContainer2D` in cache.boundaries according to the boundary types
+# from the `AeroUnstructuredSortedBoundaryTypes` in cache.boundaries according to the boundary types
 # and stores the associated global boundary indexing in NTuple
 function AeroUnstructuredSortedBoundaryTypes(boundary_conditions::NamedTuple, cache)
     # extract the unique boundary function routines from the NamedTuple

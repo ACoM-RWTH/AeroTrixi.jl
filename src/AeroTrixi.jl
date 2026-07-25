@@ -10,7 +10,7 @@ using Trixi
 using Trixi: @printf, @sprintf, print_level_information,
              @trixi_timeit, @notimeit, timer,
              DiscreteCallback, SolutionAnalyzer,
-             P4estBoundaryContainer, UnstructuredBoundaryContainer2D,
+             P4estBoundaryContainer,
              SemiHypMeshBCSolver,
              create_cache_analysis, summary_box, ncalls,
              AbstractEquations, AbstractEquationsParabolic, AbstractSemidiscretization,
