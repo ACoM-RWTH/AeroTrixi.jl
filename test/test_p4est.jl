@@ -27,7 +27,11 @@ isdir(outdir) && rm(outdir, recursive = true)
                                 0.6836203300405327,
                                 1.4202190591669863
                             ],
-                            tspan=(0.0, 0.1))
+                            tspan=(0.0, 0.1),
+                            # For testing only
+                            AeroBoundaryConditions((Inflow = bc_farfield,
+                                                    Outflow = bc_farfield,
+                                                    Airfoil = boundary_condition_slip_wall)))
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
         @test_allocations(Trixi.rhs!, semi, sol, 1000)
