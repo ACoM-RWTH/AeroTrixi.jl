@@ -10,7 +10,7 @@ using Trixi
 using Trixi: @printf, @sprintf, print_level_information,
              @trixi_timeit, @notimeit, timer,
              DiscreteCallback, SolutionAnalyzer,
-             P4estBoundaryContainer,
+             P4estBoundaryContainer, UnstructuredBoundaryContainer2D,
              SemiHypMeshBCSolver,
              create_cache_analysis, summary_box, ncalls,
              AbstractEquations, AbstractEquationsParabolic, AbstractSemidiscretization,
@@ -36,6 +36,7 @@ import Trixi: pretty_form_ascii, pretty_form_utf,
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
+using Adapt: Adapt, adapt
 using MuladdMacro: @muladd
 using StaticArrays: SVector, SMatrix, SArray, MVector, MArray
 using LinearAlgebra: norm

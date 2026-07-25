@@ -146,6 +146,5 @@ function reinitialize!(boundary_types_container::AeroUnstructuredSortedBoundaryT
 end
 
 # @eval due to @muladd
-#@eval Adapt.@adapt_structure(AeroUnstructuredSortedBoundaryTypes)
-
+@eval Adapt.@adapt_structure(AeroUnstructuredSortedBoundaryTypes)
 end # @muladd

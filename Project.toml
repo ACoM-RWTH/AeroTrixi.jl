@@ -4,6 +4,7 @@ authors = ["Arpit Babbar", "Daniel Doehring"]
 version = "0.3.0"
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
