@@ -44,6 +44,7 @@ include("auxiliary.jl")
 
 include("solvers/solvers.jl")
 include("callbacks_step/callbacks_step.jl")
+include("semidiscretization/semidiscretization_hyperbolic.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        AnalysisCallback,

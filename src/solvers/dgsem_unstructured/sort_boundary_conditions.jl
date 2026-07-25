@@ -14,8 +14,8 @@ during the call to `calc_boundary_flux!`. The original `NamedTuple` of the bound
 set by the user in the elixir file is also stored for printing.
 """
 mutable struct AeroUnstructuredSortedBoundaryTypes{N, BCs <: NTuple{N, Any},
-                                               Vec <: AbstractVector{<:Integer},
-                                               BoundaryConditions <: NamedTuple}
+                                                   Vec <: AbstractVector{<:Integer},
+                                                   BoundaryConditions <: NamedTuple}
     const boundary_condition_types::BCs # specific boundary condition type(s), e.g. BoundaryConditionDirichlet
     boundary_indices::NTuple{N, Vec} # integer vectors containing global boundary indices
     const boundary_conditions::BoundaryConditions # boundary conditions as set by the user in the elixir file
@@ -38,12 +38,12 @@ function AeroUnstructuredSortedBoundaryTypes(boundary_conditions::NamedTuple, ca
                                                                          cache)
 
     return AeroUnstructuredSortedBoundaryTypes{n_boundary_types,
-                                           typeof(boundary_condition_types),
-                                           Vector{Int},
-                                           BoundaryConditions}(boundary_condition_types,
-                                                               boundary_indices,
-                                                               boundary_conditions,
-                                                               boundary_symbol_indices)
+                                               typeof(boundary_condition_types),
+                                               Vector{Int},
+                                               BoundaryConditions}(boundary_condition_types,
+                                                                   boundary_indices,
+                                                                   boundary_conditions,
+                                                                   boundary_symbol_indices)
 end
 
 # Check that supplied boundary conditions are valid, i.e.,
@@ -147,78 +147,5 @@ end
 
 # @eval due to @muladd
 #@eval Adapt.@adapt_structure(AeroUnstructuredSortedBoundaryTypes)
-
-# From Trixi.jl: "src/callbacks_step/amr.jl"
-function reinitialize_boundaries!(boundary_conditions::AeroUnstructuredSortedBoundaryTypes,
-                                  cache)
-    # Reinitialize boundary types container because boundaries may have changed.
-    return reinitialize!(boundary_conditions, cache)
-end
-
-# From Trixi.jl: "src/solvers/dgsem_p4est/containers.jl"
-# Currently only used for debugging/providing info in error/warning messages
-@inline get_boundary_element(boundaries::P4estBoundaryContainer, boundary_index) = boundaries.neighbor_ids[boundary_index]
-
-# From Trixi.jl: "src/solvers/dgsem_unstructured/containers_2d.jl"
-@inline get_boundary_element(boundaries::UnstructuredBoundaryContainer2D, boundary_index) = boundaries.element_id[boundary_index]
-
-function Trixi.digest_boundary_conditions(boundary_conditions::NamedTuple,
-                                    mesh::Union{P4estMesh{2}, P4estMeshView{2},
-                                                UnstructuredMesh2D,
-                                                T8codeMesh{2}},
-                                    solver, cache)
-    return AeroUnstructuredSortedBoundaryTypes(boundary_conditions, cache)
-end
-
-function Trixi.digest_boundary_conditions(boundary_conditions::NamedTuple,
-                                    mesh::Union{P4estMesh{3}, T8codeMesh{3}},
-                                    solver, cache)
-    return AeroUnstructuredSortedBoundaryTypes(boundary_conditions, cache)
-end
-
-function digest_boundary_conditions(boundary_conditions::AeroUnstructuredSortedBoundaryTypes,
-                                    mesh::Union{P4estMesh{2}, P4estMeshView{2},
-                                                UnstructuredMesh2D,
-                                                T8codeMesh{2}},
-                                    solver, cache)
-    return boundary_conditions
-end
-
-function digest_boundary_conditions(boundary_conditions::AeroUnstructuredSortedBoundaryTypes,
-                                    mesh::Union{P4estMesh{3}, T8codeMesh{3}},
-                                    solver, cache)
-    return boundary_conditions
-end
-
-# allow passing a single BC that get converted into a named tuple of BCs
-# on (mapped) hypercube domains
-function Trixi.digest_boundary_conditions(boundary_conditions,
-                                    mesh::Union{P4estMesh{2}, P4estMeshView{2},
-                                                UnstructuredMesh2D,
-                                                T8codeMesh{2}},
-                                    solver, cache)
-    bcs = (; x_neg = boundary_conditions, x_pos = boundary_conditions,
-           y_neg = boundary_conditions, y_pos = boundary_conditions)
-    return AeroUnstructuredSortedBoundaryTypes(bcs, cache)
-end
-
-function Trixi.digest_boundary_conditions(boundary_conditions,
-                                    mesh::Union{P4estMesh{3}, T8codeMesh{3}},
-                                    solver, cache)
-    bcs = (; x_neg = boundary_conditions, x_pos = boundary_conditions,
-           y_neg = boundary_conditions, y_pos = boundary_conditions,
-           z_neg = boundary_conditions, z_pos = boundary_conditions)
-    return AeroUnstructuredSortedBoundaryTypes(bcs, cache)
-end
-
-function print_boundary_conditions(io,
-                                   semi::SemiHypMeshBCSolver{<:Any,
-                                                             <:AeroUnstructuredSortedBoundaryTypes})
-    @unpack boundary_conditions = semi.boundary_conditions
-    summary_line(io, "boundary conditions", length(boundary_conditions))
-    for (boundary_name, boundary_condition) in pairs(boundary_conditions)
-        summary_line(increment_indent(io), boundary_name, typeof(boundary_condition))
-    end
-end
 
 end # @muladd
