@@ -49,6 +49,48 @@ isdir(outdir) && rm(outdir, recursive = true)
         # (e.g., from type instabilities)
         @test_allocations(Trixi.rhs!, semi, sol, 1000)
     end
+
+    @trixi_testset "elixir_eulermst1T_chem.jl" begin
+        # `initial_condition` is the analytical solution at time `t`, so these are
+        # the errors of the chemistry integration rather than of the flow field
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_eulermst1T_chem.jl"),
+                            l2=[
+                                3.180301991599695e-15,
+                                3.1803019915996924e-15,
+                                1.9590192448834736e-14,
+                                5.741238820271878e-13,
+                                5.693900823875728e-13
+                            ],
+                            linf=[
+                                1.0501327460515194e-14,
+                                1.0501327460515076e-14,
+                                2.708944180085382e-14,
+                                5.748179709996748e-13,
+                                5.702660565987117e-13
+                            ])
+
+        # The reaction is integrated against its closed-form solution: with constant
+        # rate coefficients the species equations decouple from the energy equation,
+        # and with `2 n_mol + n_atom` conserved `n_mol` solves a Riccati equation.
+        # Roughly 30% of the molecules dissociate over the run.
+        let u = Trixi.wrap_array(sol.u[end], semi)
+            inv_mass_mol = equations.thermodata.inv_mass[1]
+            n_mol = u[4, 1, 1, 1] * inv_mass_mol
+
+            @test isapprox(n_mol, n_mol_exact(sol.t[end]), rtol = 1e-10)
+            @test isapprox(n_mol, 0.35, rtol = 1e-2)
+
+            # the state stays uniform: the DG operator contributes nothing here, so
+            # every node must follow the same reaction ODE
+            n_mol_nodes = @view(u[4, :, :, :]) .* inv_mass_mol
+            @test maximum(abs.(n_mol_nodes .- n_mol)) < 1e-13
+        end
+
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        @test_allocations(Trixi.rhs!, semi, sol, 1000)
+    end
 end
 
 end # module
