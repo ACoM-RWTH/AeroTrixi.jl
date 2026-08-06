@@ -147,15 +147,23 @@ analysis_callback = Trixi.AnalysisCallback(semi, interval = 10,
                                            extra_analysis_integrals = (entropy,
                                                                        Trixi.entropy_timederivative))
 
-save_solution = SaveSolutionCallback(dt = (tspan[2] - tspan[1]) / 50,
+save_solution = SaveSolutionCallback(interval = 100,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      solution_variables = cons2prim_scaled)
 
+# the time step is prescribed by the CFL condition rather than by an error
+# estimator: an adaptive step sequence depends on the time integrator version and
+# makes the solution irreproducible below the integrator tolerance
+stepsize_callback = StepsizeCallback(cfl = 0.5)
+
 callbacks = CallbackSet(summary_callback,
                         analysis_callback,
                         alive_callback,
-                        save_solution)
+                        save_solution,
+                        stepsize_callback)
 
-sol = solve(ode, SSPRK43(); abstol = 1.0e-6, reltol = 1.0e-6,
+sol = solve(ode, SSPRK43();
+            dt = 1.0, # overwritten by the stepsize_callback
+            adaptive = false, # SSPRK43 is adaptive by default, which the callback forbids
             ode_default_options()..., callback = callbacks);
