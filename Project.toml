@@ -1,6 +1,6 @@
 name = "AeroTrixi"
 uuid = "96ec6574-3e85-11f1-3b3c-2957db4b7004"
-version = "0.1.0"
+version = "0.4.0"
 authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko"]
 
 [deps]
