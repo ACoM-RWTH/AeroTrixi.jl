@@ -5,6 +5,5 @@
 @muladd begin
 #! format: noindent
 
-include("amr.jl")
 include("analysis.jl")
 end # @muladd

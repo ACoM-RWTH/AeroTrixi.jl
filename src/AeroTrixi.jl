@@ -10,14 +10,12 @@ using Trixi
 using Trixi: @printf, @sprintf, print_level_information,
              @trixi_timeit, @notimeit, timer,
              DiscreteCallback, SolutionAnalyzer,
-             P4estBoundaryContainer, UnstructuredBoundaryContainer2D,
-             SemiHypMeshBCSolver,
              create_cache_analysis, summary_box, ncalls,
              AbstractEquations, AbstractEquationsParabolic, AbstractSemidiscretization,
              mesh_equations_solver_cache, get_tmp_cache,
              wrap_array,
              derivative_discontinuity!, isfinished,
-             mpi_isroot, mpi_nranks, mpi_println, mpi_isparallel,
+             mpi_isroot, mpi_nranks, mpi_println,
              ndofsglobal, ndofs, nelementsglobal, nelements,
              get_name, attributes,
              get_boundary_indices, get_node_coords, get_normal_direction,
@@ -31,25 +29,20 @@ using Trixi: @printf, @sprintf, print_level_information,
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
-              initialize!,
-              digest_boundary_conditions, reinitialize_boundaries!
+              initialize!
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
-using Adapt: Adapt, adapt
 using MuladdMacro: @muladd
 using StaticArrays: SVector, SMatrix, SArray, MVector, MArray
 using LinearAlgebra: norm
 
 include("auxiliary.jl")
 
-include("solvers/solvers.jl")
 include("callbacks_step/callbacks_step.jl")
-include("semidiscretization/semidiscretization_hyperbolic.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        AnalysisCallback,
-       AeroBoundaryConditions,
        examples_dir
 
 end
