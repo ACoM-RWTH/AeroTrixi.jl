@@ -37,7 +37,7 @@ isdir(outdir) && rm(outdir, recursive = true)
         # holds at any state and does not depend on the time integration scheme.
         let u_ode = sol.u[end]
             du_ode = similar(u_ode)
-            Trixi.rhs!(du_ode, u_ode, semi, sol.t[end])
+            Trixi.rhs_hyperbolic!(du_ode, u_ode, semi, sol.t[end])
             dSdt = Trixi.analyze(Trixi.entropy_timederivative,
                                  Trixi.wrap_array(du_ode, semi),
                                  Trixi.wrap_array(u_ode, semi),
@@ -47,7 +47,7 @@ isdir(outdir) && rm(outdir, recursive = true)
 
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
-        @test_allocations(Trixi.rhs!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
 
     @trixi_testset "elixir_eulermst1T_chem.jl" begin
@@ -89,7 +89,7 @@ isdir(outdir) && rm(outdir, recursive = true)
 
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
-        @test_allocations(Trixi.rhs!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
 end
 
