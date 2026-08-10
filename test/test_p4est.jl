@@ -30,7 +30,7 @@ isdir(outdir) && rm(outdir, recursive = true)
                             tspan=(0.0, 0.1))
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
-        @test_allocations(Trixi.rhs!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
 
     @trixi_testset "elixir_navierstokes_NACA0012airfoil_mach08.jl" begin
@@ -51,7 +51,7 @@ isdir(outdir) && rm(outdir, recursive = true)
                             tspan=(0.0, 0.02))
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
-        @test_allocations(Trixi.rhs!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
         @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
     end
 end
