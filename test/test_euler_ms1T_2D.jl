@@ -94,8 +94,9 @@ end
                      MASS_ATOM * (1 - x_mol) * n * e_full_atom(T)) / rho
 
             @test density(u, EQUATIONS)≈rho / REF_Q.rho_ref rtol=1e-12
-            @test energy_kinetic(u, EQUATIONS)≈0.5 * rho * (v1^2 + v2^2) /
-                                               (REF_Q.e_ref * REF_Q.rho_ref) rtol=1e-12
+            @test energy_kinetic(u,
+                                 EQUATIONS)≈0.5 * rho * (v1^2 + v2^2) /
+                                            (REF_Q.e_ref * REF_Q.rho_ref) rtol=1e-12
             @test energy_internal(u, EQUATIONS)≈e_int * rho /
                                                 (REF_Q.e_ref * REF_Q.rho_ref) rtol=1e-11
             @test energy_internal(u, EQUATIONS) + energy_kinetic(u, EQUATIONS)≈u[3] rtol=1e-12
@@ -170,8 +171,9 @@ end
 
         for dir in directions()
             n = SVector{2}(dir ./ sqrt(dir[1]^2 + dir[2]^2))
-            @test flux_oblapenko(u_ll, u_rr, n, EQUATIONS)≈flux_rotated(u_ll, u_rr, n,
-                                                                        EQUATIONS) atol=1e-13
+            @test flux_oblapenko(u_ll, u_rr, n,
+                                 EQUATIONS)≈flux_rotated(u_ll, u_rr, n,
+                                                         EQUATIONS) atol=1e-13
         end
     end
 
@@ -189,12 +191,14 @@ end
         u_rr = scaled_cons(5200.5, -750.0, 858.0, 18000.0, 0.55)
 
         # flux_oblapenko(orientation=1) must equal flux_oblapenko(normal=[1,0]) etc.
-        @test flux_oblapenko(u_ll, u_rr, 1, EQUATIONS)≈flux_oblapenko(u_ll, u_rr,
-                                                                      SVector(1.0, 0.0),
-                                                                      EQUATIONS) atol=1e-13
-        @test flux_oblapenko(u_ll, u_rr, 2, EQUATIONS)≈flux_oblapenko(u_ll, u_rr,
-                                                                      SVector(0.0, 1.0),
-                                                                      EQUATIONS) atol=1e-13
+        @test flux_oblapenko(u_ll, u_rr, 1,
+                             EQUATIONS)≈flux_oblapenko(u_ll, u_rr,
+                                                       SVector(1.0, 0.0),
+                                                       EQUATIONS) atol=1e-13
+        @test flux_oblapenko(u_ll, u_rr, 2,
+                             EQUATIONS)≈flux_oblapenko(u_ll, u_rr,
+                                                       SVector(0.0, 1.0),
+                                                       EQUATIONS) atol=1e-13
 
         # consistency: equal states give the physical flux
         u = scaled_cons(4003.5, -600.0, 780.0, 22222.0, 0.35)
@@ -217,8 +221,9 @@ end
                 @test entropy(u, EQUATIONS) == entropy_math(u, EQUATIONS)
                 @test entropy_math(u, EQUATIONS)≈-rho *
                                                  entropy_thermodynamic(u, EQUATIONS) rtol=1e-13
-                @test entropy_thermodynamic(u, EQUATIONS)≈entropy_thermodynamic(u, rho,
-                                                                                EQUATIONS) rtol=1e-13
+                @test entropy_thermodynamic(u,
+                                            EQUATIONS)≈entropy_thermodynamic(u, rho,
+                                                                             EQUATIONS) rtol=1e-13
             end
         end
 
@@ -238,10 +243,10 @@ end
             basis(i) = SVector{5}(ntuple(k -> k == i ? 1.0 : 0.0, 5))
             for u in states
                 grad = SVector{5}(ntuple(5) do i
-                    h = 1e-6 * max(abs(u[i]), 1.0)
-                    (entropy(u + h * basis(i), EQUATIONS) -
-                     entropy(u - h * basis(i), EQUATIONS)) / (2h)
-                end)
+                                      h = 1e-6 * max(abs(u[i]), 1.0)
+                                      (entropy(u + h * basis(i), EQUATIONS) -
+                                       entropy(u - h * basis(i), EQUATIONS)) / (2h)
+                                  end)
                 @test cons2entropy(u, EQUATIONS)≈grad rtol=1e-5
             end
         end

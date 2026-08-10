@@ -88,9 +88,9 @@ end
             # the vanishing-anharmonicity limit of the anharmonic generator, which
             # cuts on the unshifted ladder by construction, must agree exactly
             @test ve_zero ≈ generate_e_vibr_arr_anharmonic_cutoff_K(Θ, 0.0, E_diss;
-                                                                    ground_level_energy_zero = true)
+                                                          ground_level_energy_zero = true)
             @test ve_offset ≈ generate_e_vibr_arr_anharmonic_cutoff_K(Θ, 0.0, E_diss;
-                                                                      ground_level_energy_zero = false)
+                                                          ground_level_energy_zero = false)
         end
     end
 
@@ -176,8 +176,9 @@ end
         for Δ in (0.5 * Θ, 12345.0)
             ve_shifted = ve .+ Δ
             for T in TEMPERATURES
-                @test e_vibr_from_array(M, ve_shifted, T)≈e_vibr_from_array(M, ve, T) +
-                                                          (k_B / M) * Δ rtol=1e-12
+                @test e_vibr_from_array(M, ve_shifted,
+                                        T)≈e_vibr_from_array(M, ve, T) +
+                                           (k_B / M) * Δ rtol=1e-12
                 @test c_vibr_from_array(M, ve_shifted, T)≈c_vibr_from_array(M, ve, T) rtol=1e-9
             end
         end
@@ -191,8 +192,9 @@ end
         @test length(ve_zero) == length(ve_offset)
 
         for T in TEMPERATURES
-            @test e_vibr_from_array(M, ve_offset, T)≈e_vibr_from_array(M, ve_zero, T) +
-                                                     (k_B / M) * 0.5 * Θ rtol=1e-12
+            @test e_vibr_from_array(M, ve_offset,
+                                    T)≈e_vibr_from_array(M, ve_zero, T) +
+                                       (k_B / M) * 0.5 * Θ rtol=1e-12
             @test c_vibr_from_array(M, ve_offset, T)≈c_vibr_from_array(M, ve_zero, T) rtol=1e-9
         end
 
@@ -202,8 +204,9 @@ end
         va_offset = generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_A, E_DISS;
                                                             ground_level_energy_zero = false)
         for T in TEMPERATURES
-            @test e_vibr_from_array(M, va_offset, T)≈e_vibr_from_array(M, va_zero, T) +
-                                                     (k_B / M) * va_offset[1] rtol=1e-12
+            @test e_vibr_from_array(M, va_offset,
+                                    T)≈e_vibr_from_array(M, va_zero, T) +
+                                       (k_B / M) * va_offset[1] rtol=1e-12
             @test c_vibr_from_array(M, va_offset, T)≈c_vibr_from_array(M, va_zero, T) rtol=1e-9
         end
     end
@@ -262,8 +265,9 @@ end
         ve_offset = generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_DISS * 50;
                                                           ground_level_energy_zero = false)
         for T in TEMPERATURES
-            @test e_vibr_from_array(M, ve_offset, T)≈e_vibr_iho(M, Θ, T) +
-                                                     (k_B / M) * 0.5 * Θ rtol=1e-12
+            @test e_vibr_from_array(M, ve_offset,
+                                    T)≈e_vibr_iho(M, Θ, T) +
+                                       (k_B / M) * 0.5 * Θ rtol=1e-12
             @test c_vibr_from_array(M, ve_offset, T)≈c_vibr_iho(M, Θ, T) rtol=1e-9
         end
     end
@@ -365,8 +369,9 @@ end
             index_e, frac_e, index_c, frac_c = get_index_lower_fracpos(T, td)
             @test frac_e≈0.0 atol=1e-12
 
-            @test energy_component(1, index_e, frac_e, td)≈1.5 * k_B * T / M +
-                                                           e_vibr_iho(M, Θ, T) rtol=1e-12
+            @test energy_component(1, index_e, frac_e,
+                                   td)≈1.5 * k_B * T / M +
+                                       e_vibr_iho(M, Θ, T) rtol=1e-12
             @test c_v_component(1, index_c, frac_c, td)≈1.5 * k_B / M +
                                                         c_vibr_iho(M, Θ, T) rtol=1e-12
         end

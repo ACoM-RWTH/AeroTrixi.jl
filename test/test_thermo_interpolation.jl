@@ -29,7 +29,7 @@ const C_INT = [2.0 * k_B / MASSES[1], 1.5 * k_B / MASSES[2]]
 const C_V_TOT = [1.5 * k_B / MASSES[1] + C_INT[1], 1.5 * k_B / MASSES[2] + C_INT[2]]
 
 const E_C_FUNS = [(m, T, _) -> (C_INT[1] * T, C_INT[1]),
-                  (m, T, _) -> (C_INT[2] * T, C_INT[2])]
+    (m, T, _) -> (C_INT[2] * T, C_INT[2])]
 
 const T_MIN = 100.0
 const T_MAX = 5000.0
@@ -99,38 +99,44 @@ const A_LIN = [2.0 * k_B / MASSES[1], 3.0 * k_B / MASSES[2]]
 const B_LIN = [7.0e-4 * k_B / MASSES[1], -3.0e-4 * k_B / MASSES[2]]
 
 # the internal contribution has to exclude the translational part the table adds
-const E_C_FUNS_LIN = [(m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
-                                        0.5 * B_LIN[1] * T_e^2,
-                                        (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
-                                        B_LIN[1] * T_c),
-                      (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
-                                        0.5 * B_LIN[2] * T_e^2,
-                                        (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
-                                        B_LIN[2] * T_c)]
+const E_C_FUNS_LIN = [
+    (m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
+                      0.5 * B_LIN[1] * T_e^2,
+                      (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+                      B_LIN[1] * T_c),
+    (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
+                      0.5 * B_LIN[2] * T_e^2,
+                      (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+                      B_LIN[2] * T_c)]
 
 # c_v_i(T) = A + B T + C T^2 is *not* reproduced exactly, so the tabulated
 # integral converges to the closed form at second order in ΔT
 const C_QUAD = [4.0e-8 * k_B / MASSES[1], 9.0e-8 * k_B / MASSES[2]]
 
-const E_C_FUNS_QUAD = [(m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
-                                         0.5 * B_LIN[1] * T_e^2 +
-                                         C_QUAD[1] * T_e^3 / 3,
-                                         (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
-                                         B_LIN[1] * T_c + C_QUAD[1] * T_c^2),
-                       (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
-                                         0.5 * B_LIN[2] * T_e^2 +
-                                         C_QUAD[2] * T_e^3 / 3,
-                                         (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
-                                         B_LIN[2] * T_c + C_QUAD[2] * T_c^2)]
+const E_C_FUNS_QUAD = [
+    (m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
+                      0.5 * B_LIN[1] * T_e^2 +
+                      C_QUAD[1] * T_e^3 / 3,
+                      (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+                      B_LIN[1] * T_c + C_QUAD[1] * T_c^2),
+    (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
+                      0.5 * B_LIN[2] * T_e^2 +
+                      C_QUAD[2] * T_e^3 / 3,
+                      (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+                      B_LIN[2] * T_c + C_QUAD[2] * T_c^2)]
 
-build_lin(offset; step = ΔT) = ThermoData1T(identity_ref_q(), copy(MASSES), E_C_FUNS_LIN;
-                                            T_min = T_MIN, T_max = T_MAX, ΔT = step,
-                                            cv_table_offset = offset)
+function build_lin(offset; step = ΔT)
+    ThermoData1T(identity_ref_q(), copy(MASSES), E_C_FUNS_LIN;
+                 T_min = T_MIN, T_max = T_MAX, ΔT = step,
+                 cv_table_offset = offset)
+end
 
-build_quad(offset; step = ΔT) = ThermoData1T(identity_ref_q(), copy(MASSES),
-                                             E_C_FUNS_QUAD;
-                                             T_min = T_MIN, T_max = T_MAX, ΔT = step,
-                                             cv_table_offset = offset)
+function build_quad(offset; step = ΔT)
+    ThermoData1T(identity_ref_q(), copy(MASSES),
+                 E_C_FUNS_QUAD;
+                 T_min = T_MIN, T_max = T_MAX, ΔT = step,
+                 cv_table_offset = offset)
+end
 
 # deliberately not multiples of ΔT away from T_MIN, so that the fractional
 # position inside the cell is non-zero and the partial-cell term is exercised
@@ -423,10 +429,11 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
                 end
 
                 T_sol, index_e, frac_e, index_c, frac_c = temperature_rho_inv_with_index(u,
-                                                                                        1.0 /
-                                                                                        rho,
-                                                                                        T, e,
-                                                                                        td)
+                                                                                         1.0 /
+                                                                                         rho,
+                                                                                         T,
+                                                                                         e,
+                                                                                         td)
                 @test T_sol≈T rtol=1e-9
                 @test (index_e, frac_e, index_c, frac_c) ==
                       get_index_lower_fracpos(T_sol, td)
@@ -453,9 +460,12 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
             # the indexed variant clamps to the same temperatures and returns
             # indices consistent with them
             T_c, index_e, frac_e, index_c, frac_c = temperature_rho_inv_with_index(u,
-                                                                                  1.0 / rho,
-                                                                                  0.5 * T_MIN,
-                                                                                  e_mid, td)
+                                                                                   1.0 /
+                                                                                   rho,
+                                                                                   0.5 *
+                                                                                   T_MIN,
+                                                                                   e_mid,
+                                                                                   td)
             @test T_c ≈ 1.0001 * T_MIN
             @test (index_e, frac_e, index_c, frac_c) == get_index_lower_fracpos(T_c, td)
         end
@@ -474,7 +484,7 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
 
             # an energy below the table minimum is clamped to the lower bound
             @test temperature_rho_inv(u, 1.0 / rho, 0.5 * (T_MIN + T_MAX), 0.5 * e_min,
-                                     td) ≈ 1.0001 * T_MIN
+                                      td) ≈ 1.0001 * T_MIN
         end
     end
 
@@ -531,7 +541,7 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
 
                 # inverting the scaled energy has to give back the scaled temperature
                 @test temperature_rho_inv(u, 1.0 / rho, T_scaled, e_exact,
-                                         td)≈T_scaled rtol=1e-9
+                                          td)≈T_scaled rtol=1e-9
             end
         end
     end

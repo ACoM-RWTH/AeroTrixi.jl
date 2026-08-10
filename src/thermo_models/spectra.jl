@@ -23,19 +23,20 @@ end
 # compute specific vibrational energy using the infinite harmonic oscillator model
 # [e] = J / kg
 function e_vibr_iho(m, Θ, T)
-    return (k_B / m) * Θ ./ ((exp.(Θ./T) .- 1.0))
+    return (k_B / m) * Θ ./ ((exp.(Θ ./ T) .- 1.0))
 end
 
 # compute specific heat of vibrational degrees of freedom using the infinite harmonic oscillator model
 # [c] = J / kg / K
 function c_vibr_iho(m, Θ, T)
-    return (k_B / m) * (Θ ./ T).^2 .* exp.(Θ ./ T) ./ (exp.(Θ ./ T) .- 1.0).^2
+    return (k_B / m) * (Θ ./ T) .^ 2 .* exp.(Θ ./ T) ./ (exp.(Θ ./ T) .- 1.0) .^ 2
 end
 
 # returns a function computing the specific vibrational energy and specific heat of vibrational degrees of freedom using the infinite harmonic oscillator model
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_vibr_iho(Θ)
-    return (m, T_e_vibr, T_c_vibr) -> (e_vibr_iho(m, Θ, T_e_vibr), c_vibr_iho(m, Θ, T_c_vibr))
+    return (m, T_e_vibr, T_c_vibr) -> (e_vibr_iho(m, Θ, T_e_vibr),
+                                       c_vibr_iho(m, Θ, T_c_vibr))
 end
 
 # generate list of vibrational energies whose energy does not exceed dissociation energy
@@ -57,10 +58,11 @@ end
 # if ground_level_energy_zero == false, E_i = (i + 0.5) * Θ - (i + 0.5)^2 * Θ_anh, i = 0, ..., i_max
 # if ground_level_energy_zero == true, E_i(ground_level_energy_zero = false) - E_0(ground_level_energy_zero = false)
 # units of computed array are K
-function generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_anh, E_diss; ground_level_energy_zero = true)
+function generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_anh, E_diss;
+                                                 ground_level_energy_zero = true)
     v_e_arr = Float64[]
     i = 0
-    while(true)
+    while (true)
         enew = (i + 0.5) * Θ - (i + 0.5)^2 * Θ_anh
         if (enew < E_diss)
             push!(v_e_arr, enew)
@@ -104,7 +106,7 @@ end
 # assuming a Boltzmann distribution of the vibrational energies
 # [c] = J / kg / K
 function c_vibr_from_array(m, E_vibr_array_K, T)
-    avg_e_sq = avg_over_vibr_array(E_vibr_array_K, E_vibr_array_K .^ 2, T) 
+    avg_e_sq = avg_over_vibr_array(E_vibr_array_K, E_vibr_array_K .^ 2, T)
     avg_e = avg_over_vibr_array(E_vibr_array_K, E_vibr_array_K, T)
     return (k_B / m) * (avg_e_sq - avg_e^2) / T^2
 end
@@ -115,6 +117,6 @@ end
 # assuming a Boltzmann distribution of the vibrational energies
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_vibr_from_array(E_vibr_array_K)
-    return (m, T_e_vibr, T_c_vibr) -> (e_vibr_from_array(m, E_vibr_array_K, T_e_vibr), c_vibr_from_array(m, E_vibr_array_K, T_c_vibr))
+    return (m, T_e_vibr, T_c_vibr) -> (e_vibr_from_array(m, E_vibr_array_K, T_e_vibr),
+                                       c_vibr_from_array(m, E_vibr_array_K, T_c_vibr))
 end
-

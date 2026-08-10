@@ -63,7 +63,7 @@ const n_m_m = -1.5
 # `eta_` from the stagnation line at -1 to the lateral outflow plane at +1
 function mapping_full(xi_, eta_, cyl_radius, points_shock)
     shock_pos = [(points_shock[1], 0.0), (points_shock[2], points_shock[2]),
-                 (0.0, points_shock[3])]  # 3 points that define shock
+        (0.0, points_shock[3])]  # 3 points that define shock
 
     # spline has form R[1] + c * eta_01^2 + d * eta_01^3, derivative w.r.t eta_01 is 0 at eta_01 = 0
     R = [sqrt(shock_pos[i][1]^2 + shock_pos[i][2]^2) for i in 1:3]  # 3 radii
