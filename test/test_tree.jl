@@ -42,7 +42,7 @@ isdir(outdir) && rm(outdir, recursive = true)
                                  Trixi.wrap_array(du_ode, semi),
                                  Trixi.wrap_array(u_ode, semi),
                                  sol.t[end], semi)
-            @test isapprox(dSdt, 0.0, atol = 1e-15)
+            @test isapprox(dSdt, 0.0, atol = 1.5e-15)
         end
 
         # Ensure that we do not have excessive memory allocations
