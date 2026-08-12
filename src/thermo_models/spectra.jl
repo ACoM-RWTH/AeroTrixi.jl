@@ -23,13 +23,13 @@ end
 # compute specific vibrational energy using the infinite harmonic oscillator model
 # [e] = J / kg
 function e_vibr_iho(m, Θ, T)
-    return (k_B / m) * Θ ./ ((exp.(Θ ./ T) .- 1.0))
+    return (k_B / m) * Θ / ((exp(Θ / T) - 1.0))
 end
 
 # compute specific heat of vibrational degrees of freedom using the infinite harmonic oscillator model
 # [c] = J / kg / K
 function c_vibr_iho(m, Θ, T)
-    return (k_B / m) * (Θ ./ T) .^ 2 .* exp.(Θ ./ T) ./ (exp.(Θ ./ T) .- 1.0) .^ 2
+    return (k_B / m) * (Θ / T)^2 * exp(Θ / T) / (exp(Θ / T) - 1.0)^2
 end
 
 # returns a function computing the specific vibrational energy and specific heat of vibrational degrees of freedom using the infinite harmonic oscillator model
