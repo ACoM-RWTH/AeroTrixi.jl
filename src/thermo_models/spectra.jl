@@ -81,7 +81,7 @@ end
 # compute vibrational partition function given an array of vibrational energies
 # assuming a Boltzmann distribution of the vibrational energies
 function Z_vibr(E_vibr_array_K, T)
-    return sum(exp.(-E_vibr_array_K ./ T))
+    return sum(exp.(-E_vibr_array_K / T))
 end
 
 # average a quantity dependent on vibrational energy over vibrational spectrum 
@@ -90,7 +90,7 @@ end
 function avg_over_vibr_array(E_vibr_array_K, array_to_avg, T)
     Z_v = Z_vibr(E_vibr_array_K, T)
 
-    return sum(array_to_avg .* exp.(-E_vibr_array_K ./ T)) / Z_v
+    return sum(array_to_avg .* exp.(-E_vibr_array_K / T)) / Z_v
 end
 
 # compute specific vibrational energy using a cut-off model by averaging
