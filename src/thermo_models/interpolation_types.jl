@@ -2,8 +2,10 @@
 abstract type Interpolation end
 struct LinearInterpolation <: Interpolation end
 
-# do we store c_v(T) at T_min + i * ΔT, or at T_min - 0.5 ΔT + i * ΔT
-# i.e. offset, or no offset w.r.t internal energy
+# subtypes  whether we store c_v(T) at T_min + i * ΔT (NoCvOffset)
+# or at T_min - 0.5 ΔT + i * ΔT (CvOffset)
+# i.e. without or with an offset with respect to
+# the points at which internal energy is stored
 abstract type CvTableOffset end
 
 """
