@@ -427,21 +427,23 @@ end
 # rho_inv is 1/rho, T0 is the initial guess for T, e is the internal energy per unit mass
 @inline function temperature_rho_inv_with_index(u, rho_inv, T0, e,
                                                 thermodata::ThermoData1T)
-    T = T0
 
-    if (T < thermodata.T_min_E)
+    # return min/max energy if T0 is less than the lower/upper bound for the tables
+    if (T0 < thermodata.T_min_E)
         return (1.0001 * thermodata.T_min_E,
                 get_index_lower_fracpos(1.0001 * thermodata.T_min_E, thermodata)...)
-    elseif (T > thermodata.T_max_E)
+    elseif (T0 > thermodata.T_max_E)
         return (0.9999 * thermodata.T_max_E,
                 get_index_lower_fracpos(0.9999 * thermodata.T_max_E, thermodata)...)
     end
 
+    # return min temperature if the actual internal energy is less than the lower bound for the tables
     if limit_T_low_rho_inv(u, rho_inv, e, thermodata)
         return (1.0001 * thermodata.T_min_E,
                 get_index_lower_fracpos(1.0001 * thermodata.T_min_E, thermodata)...)
     end
 
+    T = T0
     index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T,
                                                                                     thermodata)
     fx = energy(u, rho_inv, index_lower_e, fracpos_e, thermodata) - e
@@ -463,31 +465,8 @@ end
 # u is vector of conservative flow variables,
 # rho_inv is 1/rho, T0 is the initial guess for T, e is the internal energy per unit mass
 @inline function temperature_rho_inv(u, rho_inv, T0, e, thermodata::ThermoData1T)
-    T = T0
+    T, _, _, _, _ = temperature_rho_inv_with_index(u, rho_inv, T0, e, thermodata)
 
-    if (T < thermodata.T_min_E)
-        return 1.0001 * thermodata.T_min_E
-    elseif (T > thermodata.T_max_E)
-        return 0.9999 * thermodata.T_max_E
-    end
-
-    if limit_T_low_rho_inv(u, rho_inv, e, thermodata)
-        return 1.0001 * thermodata.T_min_E
-    end
-
-    index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T,
-                                                                                    thermodata)
-    fx = energy(u, rho_inv, index_lower_e, fracpos_e, thermodata) - e
-
-    mintol = thermodata.T_tol * e + thermodata.T_tol
-
-    while abs(fx) > mintol
-        T -= fx / c_v(u, rho_inv, index_lower_c, fracpos_c, thermodata)
-        index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T,
-                                                                                        thermodata)
-        fx = energy(u, rho_inv, index_lower_e, fracpos_e, thermodata) - e
-        # iter += 1
-    end
     return T
 end
 
