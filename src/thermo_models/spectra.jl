@@ -1,3 +1,11 @@
+# This file contains functions to compute rotational and vibrational specific energies
+# and specific heats, as well as to compute vibrational energy spectra for different
+# models (cut-off harmonic oscillator, cut-off anharmonic oscillator). The latter
+# can be used in the _from_array functions to compute vibrational specific energies
+# and specific heats by averaging the vibrational spectrum.
+
+# compute specific rotational energy and specific heat of rotational degrees of freedom
+# assuming no rotational degrees of freedom
 function e_c_none(m, T_e_rot, T_c_rot)
     return 0.0, 0.0
 end
@@ -14,7 +22,8 @@ function c_rot_cont(m, T)
     return k_B / m
 end
 
-# returns a function computing the specific rotational energy and specific heat of rotational degrees of freedom assuming a continuous and fully excited spectrum
+# returns a function computing the specific rotational energy and specific heat of rotational degrees of freedom
+# assuming a continuous and fully excited spectrum
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_rot_cont()
     return (m, T_e_rot, T_c_rot) -> (e_rot_cont(m, T_e_rot), c_rot_cont(m, T_c_rot))
@@ -63,6 +72,9 @@ function generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_anh, E_diss;
     v_e_arr = Float64[]
     i = 0
     while (true)
+        # compute vibrational energy of state i
+        # if it's less than dissociation energy, add it to the array
+        # if it's larger, stop computation
         enew = (i + 0.5) * Θ - (i + 0.5)^2 * Θ_anh
         if (enew < E_diss)
             push!(v_e_arr, enew)

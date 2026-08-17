@@ -228,18 +228,18 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         int_c_v_over_t_arr ./= ref_q.c_v_ref
         mass_arr = mass_arr ./ ref_q.m_ref
 
-        return new(ref_q,
-                    mass_arr,
-                    1.0 ./ mass_arr,
-                    T_min, T_max,
-                    T_c_min, T_c_max,
-                    dT, 1.0 / dT, T_tol,
-                    e_arr, c_v_arr,
-                    (k_B ./ mass_arr) ./ ref_q.c_v_ref,
-                    e_min_arr,
-                    T_arr, 1.0 ./ T_arr,
-                    T_c_arr, 1.0 ./ T_c_arr,
-                    int_c_v_over_t_arr)
+        return new(ref_q,  # reference quantities used for scaling
+                    mass_arr,  # species' masses
+                    1.0 ./ mass_arr,  # inverses of the species' masses
+                    T_min, T_max,  # minimum and maximum temperatures for the specific energy tables
+                    T_c_min, T_c_max,  # minimum and maximum temperatures for the specific heat tables
+                    dT, 1.0 / dT, T_tol,  # scaled temperature step size, inverse, tolerance for Newton loop
+                    e_arr, c_v_arr,  # scaled arrays of internal energies and specific heats
+                    (k_B ./ mass_arr) ./ ref_q.c_v_ref,  # scaled array of R_specific (gas constants)
+                    e_min_arr,  # per-species minimum internal energies
+                    T_arr, 1.0 ./ T_arr,  # scaled array of temperatures and their inverses
+                    T_c_arr, 1.0 ./ T_c_arr,  # scaled array of temperatures and their inverses for the specific heat tables
+                    int_c_v_over_t_arr)  # integral of c_v(T)/T used for computation of entropy
     end
 
     function ThermoData1T(ref_q::ReferenceFlowQuantities, mass_arr,
