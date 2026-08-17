@@ -1,4 +1,5 @@
 @muladd begin
+#! format: noindent
 @doc raw"""
     ThermoData1T(ref_q, mass_arr, e_c_int_function_arr;
                     T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, dT = 1.0,
@@ -99,11 +100,11 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
     # account for inside the code and should not be part of the computations in
     # e_c_int_function_arr
     function ThermoData1T{LinearInterpolation, NoCvOffset, NCOMP}(ref_q, mass_arr,
-                                                                    e_c_int_function_arr;
-                                                                    T_min = 10.0,
-                                                                    T_max = 3.0e4,
-                                                                    T_tol = 1e-9,
-                                                                    dT = 1.0) where {NCOMP}
+                                                                  e_c_int_function_arr;
+                                                                  T_min = 10.0,
+                                                                  T_max = 3.0e4,
+                                                                  T_tol = 1e-9,
+                                                                  dT = 1.0) where {NCOMP}
         @assert (length(mass_arr) == length(e_c_int_function_arr) == NCOMP)
 
         n_T = trunc(Int, (T_max - T_min) / dT) + 1
@@ -124,8 +125,8 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         e_arr = transpose(stack(e_arr, dims = 1))
         e_min_arr = vec(minimum(e_arr, dims = 1)) ./ ref_q.e_ref
         c_v_arr = transpose(stack(map((m, f) -> (map(t -> f(m, t, t)[2], T_arr) .+
-                                                    ((3.0 / 2.0) * k_B / m)), mass_arr,
-                                        e_c_int_function_arr), dims = 1))
+                                                 ((3.0 / 2.0) * k_B / m)), mass_arr,
+                                      e_c_int_function_arr), dims = 1))
 
         @inbounds for j in 1:NCOMP
             # Integrate ∫ c_v / T dT
@@ -134,8 +135,8 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
                 c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
 
                 int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
-                                            (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
-                                            log(T_b / T_a) + (c_v_b - c_v_a)
+                                           (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
+                                           log(T_b / T_a) + (c_v_b - c_v_a)
             end
         end
 
@@ -151,17 +152,17 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         mass_arr = mass_arr ./ ref_q.m_ref
 
         return new(ref_q,
-                    mass_arr,
-                    1.0 ./ mass_arr,
-                    T_min, T_max,
-                    T_min, T_max,
-                    dT, 1.0 / dT, T_tol,
-                    e_arr, c_v_arr,
-                    (k_B ./ mass_arr) ./ ref_q.c_v_ref,
-                    e_min_arr,
-                    T_arr, T_arr_inv,
-                    T_arr, T_arr_inv,  # c_v tabulated on the same grid as e
-                    int_c_v_over_t_arr)
+                   mass_arr,
+                   1.0 ./ mass_arr,
+                   T_min, T_max,
+                   T_min, T_max,
+                   dT, 1.0 / dT, T_tol,
+                   e_arr, c_v_arr,
+                   (k_B ./ mass_arr) ./ ref_q.c_v_ref,
+                   e_min_arr,
+                   T_arr, T_arr_inv,
+                   T_arr, T_arr_inv,  # c_v tabulated on the same grid as e
+                   int_c_v_over_t_arr)
     end
 
     # same as above, but c_v (and ∫ c_v / T dT) are tabulated on a grid shifted by -dT/2
@@ -200,8 +201,8 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         e_arr = transpose(stack(e_arr, dims = 1))
         e_min_arr = vec(minimum(e_arr, dims = 1)) ./ ref_q.e_ref
         c_v_arr = transpose(stack(map((m, f) -> (map(t -> f(m, t, t)[2], T_c_arr) .+
-                                                    ((3.0 / 2.0) * k_B / m)), mass_arr,
-                                        e_c_int_function_arr), dims = 1))
+                                                 ((3.0 / 2.0) * k_B / m)), mass_arr,
+                                      e_c_int_function_arr), dims = 1))
 
         @inbounds for j in 1:NCOMP
             # Integrate ∫ c_v / T dT on the c_v grid
@@ -210,8 +211,8 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
                 c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
 
                 int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
-                                            (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
-                                            log(T_b / T_a) + (c_v_b - c_v_a)
+                                           (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
+                                           log(T_b / T_a) + (c_v_b - c_v_a)
             end
         end
 
@@ -229,33 +230,33 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         mass_arr = mass_arr ./ ref_q.m_ref
 
         return new(ref_q,  # reference quantities used for scaling
-                    mass_arr,  # species' masses
-                    1.0 ./ mass_arr,  # inverses of the species' masses
-                    T_min, T_max,  # minimum and maximum temperatures for the specific energy tables
-                    T_c_min, T_c_max,  # minimum and maximum temperatures for the specific heat tables
-                    dT, 1.0 / dT, T_tol,  # scaled temperature step size, inverse, tolerance for Newton loop
-                    e_arr, c_v_arr,  # scaled arrays of internal energies and specific heats
-                    (k_B ./ mass_arr) ./ ref_q.c_v_ref,  # scaled array of R_specific (gas constants)
-                    e_min_arr,  # per-species minimum internal energies
-                    T_arr, 1.0 ./ T_arr,  # scaled array of temperatures and their inverses
-                    T_c_arr, 1.0 ./ T_c_arr,  # scaled array of temperatures and their inverses for the specific heat tables
-                    int_c_v_over_t_arr)  # integral of c_v(T)/T used for computation of entropy
+                   mass_arr,  # species' masses
+                   1.0 ./ mass_arr,  # inverses of the species' masses
+                   T_min, T_max,  # minimum and maximum temperatures for the specific energy tables
+                   T_c_min, T_c_max,  # minimum and maximum temperatures for the specific heat tables
+                   dT, 1.0 / dT, T_tol,  # scaled temperature step size, inverse, tolerance for Newton loop
+                   e_arr, c_v_arr,  # scaled arrays of internal energies and specific heats
+                   (k_B ./ mass_arr) ./ ref_q.c_v_ref,  # scaled array of R_specific (gas constants)
+                   e_min_arr,  # per-species minimum internal energies
+                   T_arr, 1.0 ./ T_arr,  # scaled array of temperatures and their inverses
+                   T_c_arr, 1.0 ./ T_c_arr,  # scaled array of temperatures and their inverses for the specific heat tables
+                   int_c_v_over_t_arr)  # integral of c_v(T)/T used for computation of entropy
     end
 
     function ThermoData1T(ref_q::ReferenceFlowQuantities, mass_arr,
-                            e_c_int_function_arr;
-                            T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, dT = 1.0,
-                            interpolation = :linear, cv_table_offset = false)
+                          e_c_int_function_arr;
+                          T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, dT = 1.0,
+                          interpolation = :linear, cv_table_offset = false)
         NCOMP = length(mass_arr)
         if interpolation == :linear
             if cv_table_offset == true
                 return ThermoData1T{LinearInterpolation, CvOffset, NCOMP}(ref_q,
-                                                                            mass_arr,
-                                                                            e_c_int_function_arr;
-                                                                            T_min = T_min,
-                                                                            T_max = T_max,
-                                                                            T_tol = T_tol,
-                                                                            dT = dT)
+                                                                          mass_arr,
+                                                                          e_c_int_function_arr;
+                                                                          T_min = T_min,
+                                                                          T_max = T_max,
+                                                                          T_tol = T_tol,
+                                                                          dT = dT)
             else
                 return ThermoData1T{LinearInterpolation, NoCvOffset, NCOMP}(ref_q,
                                                                             mass_arr,
@@ -272,7 +273,7 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
 end
 
 @inline function ncomponents(thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO,
-                                                                                NCOMP}
+                                                                             NCOMP}
     NCOMP
 end
 
@@ -282,7 +283,7 @@ end
 
 # return index and fractional position for energy and cv interpolation in case of no offset
 @inline function get_index_lower_fracpos(T,
-                                            thermodata::ThermoData1T{I, NoCvOffset, NCOMP}) where {
+                                         thermodata::ThermoData1T{I, NoCvOffset, NCOMP}) where {
                                                                                                 I,
                                                                                                 NCOMP
                                                                                                 }
@@ -300,10 +301,10 @@ end
 # so it only differs from the energy one by a constant shift of 1/2 and can be obtained
 # from `fracpos` with a single comparison - no second division/floor needed
 @inline function get_index_lower_fracpos(T,
-                                            thermodata::ThermoData1T{I, CvOffset, NCOMP}) where {
-                                                                                                I,
-                                                                                                NCOMP
-                                                                                                }
+                                         thermodata::ThermoData1T{I, CvOffset, NCOMP}) where {
+                                                                                              I,
+                                                                                              NCOMP
+                                                                                              }
     fracpos = (T - thermodata.T_min_E) * thermodata.inv_dT
     index_lower = floor(Int, fracpos)
     fracpos -= index_lower
@@ -319,17 +320,17 @@ end
 
 # compute energy of species i_comp using linear interpolation
 @inline function energy_component(i_comp, index_lower_e, fracpos_e,
-                                    thermodata::ThermoData1T{LinearInterpolation, CvO,
-                                                            NCOMP}) where {CvO, NCOMP}
+                                  thermodata::ThermoData1T{LinearInterpolation, CvO,
+                                                           NCOMP}) where {CvO, NCOMP}
     @inbounds return thermodata.e_arr[index_lower_e, i_comp] * (1.0 - fracpos_e) +
-                        fracpos_e * thermodata.e_arr[index_lower_e + 1, i_comp]
+                     fracpos_e * thermodata.e_arr[index_lower_e + 1, i_comp]
 end
 
 # compute energy given temperature and array of densities
 # used for prim2cons transformation
 @inline function energy_from_rho_vec(rho_vec::SVector, rho, T,
-                                        thermodata::ThermoData1T{LinearInterpolation, CvO,
-                                                                NCOMP}) where {CvO, NCOMP}
+                                     thermodata::ThermoData1T{LinearInterpolation, CvO,
+                                                              NCOMP}) where {CvO, NCOMP}
     result = 0.0
 
     index_lower_e, fracpos_e, _, _ = get_index_lower_fracpos(T, thermodata)
@@ -341,10 +342,10 @@ end
 end
 
 @inline function c_v_component(i_comp, index_lower_c, fracpos_c,
-                                thermodata::ThermoData1T{LinearInterpolation, CvO,
+                               thermodata::ThermoData1T{LinearInterpolation, CvO,
                                                         NCOMP}) where {CvO, NCOMP}
     @inbounds return thermodata.c_v_arr[index_lower_c, i_comp] * (1.0 - fracpos_c) +
-                        fracpos_c * thermodata.c_v_arr[index_lower_c + 1, i_comp]
+                     fracpos_c * thermodata.c_v_arr[index_lower_c + 1, i_comp]
 end
 
 # compute specific energy of flow given values of interpolation point and fractional position 
@@ -361,7 +362,7 @@ end
 # compute specific heat capacity of flow given values of interpolation point and fractional position 
 # rho_inv = 1/rho
 @inline function c_v(u, rho_inv, index_lower_c, fracpos_c,
-                        thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
+                     thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
     result = 0.0
     @inbounds for i in eachcomponent(thermodata)
         result += c_v_component(i, index_lower_c, fracpos_c, thermodata) * u[i + 3]
@@ -377,20 +378,20 @@ end
 # c_v_n - c_v(T_a + dT) - next tabulated value
 @inline function entropy_c_v_integral_component(i_comp, index_lower_c, T_b,
                                                 thermodata::ThermoData1T{LinearInterpolation,
-                                                                            CvO, NCOMP}) where {
-                                                                                                CvO,
-                                                                                                NCOMP
-                                                                                                }
+                                                                         CvO, NCOMP}) where {
+                                                                                             CvO,
+                                                                                             NCOMP
+                                                                                             }
     @inbounds T_a = thermodata.T_c_arr[index_lower_c]
     @inbounds T_a_inv = thermodata.T_c_arr_inv[index_lower_c]
 
     @inbounds c_v_a = thermodata.c_v_arr[index_lower_c, i_comp]    # value of c_v at closest_T
     @inbounds slope = (thermodata.c_v_arr[index_lower_c + 1, i_comp] - c_v_a) *
-                        thermodata.inv_dT
+                      thermodata.inv_dT
     integrate_part = (c_v_a - slope * T_a) * log(T_b * T_a_inv) + slope * (T_b - T_a)
 
     @inbounds return thermodata.int_c_v_over_t_arr[index_lower_c, i_comp] +
-                        integrate_part
+                     integrate_part
 end
 
 # compute ∫ c_v / T dT of flow
@@ -400,7 +401,7 @@ end
     _, _, index_lower_c, _ = get_index_lower_fracpos(T, thermodata)
     @inbounds for i in eachcomponent(thermodata)
         result += entropy_c_v_integral_component(i, index_lower_c, T, thermodata) *
-                    u[i + 3] / rho
+                  u[i + 3] / rho
     end
     return result
 end
@@ -445,7 +446,7 @@ end
 
     T = T0
     index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T,
-                                                                                    thermodata)
+                                                                                 thermodata)
     fx = energy(u, rho_inv, index_lower_e, fracpos_e, thermodata) - e
 
     mintol = thermodata.T_tol * e + thermodata.T_tol
@@ -453,7 +454,7 @@ end
     while abs(fx) > mintol
         T -= fx / c_v(u, rho_inv, index_lower_c, fracpos_c, thermodata)
         index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T,
-                                                                                        thermodata)
+                                                                                     thermodata)
         fx = energy(u, rho_inv, index_lower_e, fracpos_e, thermodata) - e
         # iter += 1
     end
@@ -473,7 +474,7 @@ end
 # compute adiabatic index γ(T) via interpolation
 # rho_inv = 1/rho
 @inline function get_gamma(u, rho_inv, index_lower_c, fracpos_c,
-                            thermodata::ThermoData1T)
+                           thermodata::ThermoData1T)
     c_v_val = c_v(u, rho_inv, index_lower_c, fracpos_c, thermodata)
     c_p = 0.0
 
