@@ -33,8 +33,8 @@ const E_C_FUNS = [(m, T, _) -> (C_INT[1] * T, C_INT[1]),
 
 const T_MIN = 100.0
 const T_MAX = 5000.0
-const ΔT = 10.0
-const N_T = trunc(Int, (T_MAX - T_MIN) / ΔT) + 1
+const dT = 10.0
+const N_T = trunc(Int, (T_MAX - T_MIN) / dT) + 1
 
 # mass fractions used to build the conservative state
 const Y = [0.4, 0.6]
@@ -53,7 +53,7 @@ end
 
 function build(ref_q, offset)
     return ThermoData1T(ref_q, copy(MASSES), E_C_FUNS;
-                        T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
+                        T_min = T_MIN, T_max = T_MAX, dT = dT,
                         cv_table_offset = offset)
 end
 
@@ -63,13 +63,13 @@ state(rho) = SVector(0.0, 0.0, 0.0, rho * Y[1], rho * Y[2])
 
 # reference implementation of the index lookup, using an independent division and
 # floor per grid instead of the single-comparison shortcut in `get_index_lower_fracpos`
-function reference_indices(T, T_min, ΔT, offset)
-    pos_e = (T - T_min) / ΔT
+function reference_indices(T, T_min, dT, offset)
+    pos_e = (T - T_min) / dT
     index_e = floor(Int, pos_e)
     frac_e = pos_e - index_e
 
-    T_min_c = offset ? T_min - 0.5 * ΔT : T_min
-    pos_c = (T - T_min_c) / ΔT
+    T_min_c = offset ? T_min - 0.5 * dT : T_min
+    pos_c = (T - T_min_c) / dT
     index_c = floor(Int, pos_c)
     frac_c = pos_c - index_c
 
@@ -110,7 +110,7 @@ const E_C_FUNS_LIN = [
                       B_LIN[2] * T_c)]
 
 # c_v_i(T) = A + B T + C T^2 is *not* reproduced exactly, so the tabulated
-# integral converges to the closed form at second order in ΔT
+# integral converges to the closed form at second order in dT
 const C_QUAD = [4.0e-8 * k_B / MASSES[1], 9.0e-8 * k_B / MASSES[2]]
 
 const E_C_FUNS_QUAD = [
@@ -125,20 +125,20 @@ const E_C_FUNS_QUAD = [
                       (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
                       B_LIN[2] * T_c + C_QUAD[2] * T_c^2)]
 
-function build_lin(offset; step = ΔT)
+function build_lin(offset; step = dT)
     ThermoData1T(identity_ref_q(), copy(MASSES), E_C_FUNS_LIN;
-                 T_min = T_MIN, T_max = T_MAX, ΔT = step,
+                 T_min = T_MIN, T_max = T_MAX, dT = step,
                  cv_table_offset = offset)
 end
 
-function build_quad(offset; step = ΔT)
+function build_quad(offset; step = dT)
     ThermoData1T(identity_ref_q(), copy(MASSES),
                  E_C_FUNS_QUAD;
-                 T_min = T_MIN, T_max = T_MAX, ΔT = step,
+                 T_min = T_MIN, T_max = T_MAX, dT = step,
                  cv_table_offset = offset)
 end
 
-# deliberately not multiples of ΔT away from T_MIN, so that the fractional
+# deliberately not multiples of dT away from T_MIN, so that the fractional
 # position inside the cell is non-zero and the partial-cell term is exercised
 const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
 
@@ -165,18 +165,18 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
             @test length(td.T_c_arr_inv) == n_c
             @test td.T_c_arr_inv ≈ 1.0 ./ td.T_c_arr
 
-            # c_v grid is shifted by -ΔT/2 when the offset is used, and by nothing otherwise
-            T_c_min = offset ? T_MIN - 0.5 * ΔT : T_MIN
+            # c_v grid is shifted by -dT/2 when the offset is used, and by nothing otherwise
+            T_c_min = offset ? T_MIN - 0.5 * dT : T_MIN
             @test td.T_min_c_v ≈ T_c_min
-            @test td.T_max_c_v ≈ T_c_min + (n_c - 1) * ΔT
-            @test td.T_c_arr ≈ [T_c_min + (i - 1) * ΔT for i in 1:n_c]
+            @test td.T_max_c_v ≈ T_c_min + (n_c - 1) * dT
+            @test td.T_c_arr ≈ [T_c_min + (i - 1) * dT for i in 1:n_c]
 
             # the c_v grid has to bracket the whole energy range
             @test td.T_c_arr[1] <= T_MIN
             @test td.T_c_arr[end] >= T_MAX
 
-            @test td.ΔT ≈ ΔT
-            @test td.inv_ΔT ≈ 1.0 / ΔT
+            @test td.dT ≈ dT
+            @test td.inv_dT ≈ 1.0 / dT
         end
     end
 
@@ -194,7 +194,7 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
 
             for T in sample_temperatures(50)
                 index_e, frac_e, index_c, frac_c = get_index_lower_fracpos(T, td)
-                ref_e, ref_fe, ref_c, ref_fc = reference_indices(T, T_MIN, ΔT, offset)
+                ref_e, ref_fe, ref_c, ref_fc = reference_indices(T, T_MIN, dT, offset)
 
                 # must agree with the independent two-division reference
                 @test index_e == ref_e
@@ -387,9 +387,9 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
         end
     end
 
-    @testset "entropy integral is second-order accurate in ΔT" begin
+    @testset "entropy integral is second-order accurate in dT" begin
         # with a quadratic c_v the piecewise-linear table is no longer exact;
-        # halving ΔT then has to cut the error by about four
+        # halving dT then has to cut the error by about four
         T_a, T_b = 462.71, 4321.98
         exact(i) = (A_LIN[i] * log(T_b / T_a) + B_LIN[i] * (T_b - T_a) +
                     0.5 * C_QUAD[i] * (T_b^2 - T_a^2))
@@ -516,11 +516,11 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
             # grids are stored in units of T_ref
             @test td.T_min_E ≈ T_MIN / ref_q.T_ref
             @test td.T_max_E ≈ T_MAX / ref_q.T_ref
-            @test td.ΔT ≈ ΔT / ref_q.T_ref
-            @test td.T_arr ≈ [T_MIN + (i - 1) * ΔT for i in 1:N_T] ./ ref_q.T_ref
+            @test td.dT ≈ dT / ref_q.T_ref
+            @test td.T_arr ≈ [T_MIN + (i - 1) * dT for i in 1:N_T] ./ ref_q.T_ref
 
-            T_c_min = offset ? T_MIN - 0.5 * ΔT : T_MIN
-            @test td.T_c_arr ≈ [T_c_min + (i - 1) * ΔT for i in 1:n_c] ./ ref_q.T_ref
+            T_c_min = offset ? T_MIN - 0.5 * dT : T_MIN
+            @test td.T_c_arr ≈ [T_c_min + (i - 1) * dT for i in 1:n_c] ./ ref_q.T_ref
 
             # masses are stored in units of m_ref
             @test td.mass ≈ MASSES ./ ref_q.m_ref
@@ -555,15 +555,15 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
                                                                                      E_C_FUNS;
                                                                                      T_min = T_MIN,
                                                                                      T_max = T_MAX,
-                                                                                     ΔT = ΔT)
+                                                                                     dT = dT)
 
-        # the offset c_v grid starts at T_min - ΔT/2, which must stay positive
+        # the offset c_v grid starts at T_min - dT/2, which must stay positive
         @test_throws AssertionError ThermoData1T(ref_q, copy(MASSES), E_C_FUNS;
-                                                 T_min = 0.5 * ΔT, T_max = T_MAX, ΔT = ΔT,
+                                                 T_min = 0.5 * dT, T_max = T_MAX, dT = dT,
                                                  cv_table_offset = true)
 
         @test_throws ErrorException ThermoData1T(ref_q, copy(MASSES), E_C_FUNS;
-                                                 T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
+                                                 T_min = T_MIN, T_max = T_MAX, dT = dT,
                                                  interpolation = :quadratic)
     end
 
@@ -574,7 +574,7 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
             masses_copy = copy(MASSES)
 
             td = ThermoData1T(ref_q, masses_copy, E_C_FUNS;
-                              T_min = T_MIN, T_max = T_MAX, ΔT = ΔT,
+                              T_min = T_MIN, T_max = T_MAX, dT = dT,
                               cv_table_offset = offset)
 
             # the caller's array must come back untouched, while the stored masses

@@ -1,7 +1,7 @@
 @muladd begin
     @doc raw"""
         ThermoData1T(ref_q, mass_arr, e_c_int_function_arr;
-                     T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, ΔT = 1.0,
+                     T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, dT = 1.0,
                      interpolation = :linear, cv_table_offset = false)
 
     Tabulated thermodynamic data for a flow of `NCOMP` species in thermal equilibrium,
@@ -47,7 +47,7 @@
     - `e_c_int_function_arr`: one callable per species, `(m, T_e, T_c) -> (e, c_v)`,
       returning the internal-degree-of-freedom contributions only. The translational
       parts must *not* be included.
-    - `T_min`, `T_max`, `ΔT`: tabulation range and step, in K.
+    - `T_min`, `T_max`, `dT`: tabulation range and step, in K.
     - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
     - `interpolation`: only `:linear` is implemented.
     - `cv_table_offset`: place ``c_v`` on the midpoint grid, see above.
@@ -64,8 +64,8 @@
         T_min_c_v::Float64
         T_max_c_v::Float64
 
-        ΔT::Float64
-        inv_ΔT::Float64
+        dT::Float64
+        inv_dT::Float64
         T_tol::Float64
 
         # N_cv_discretization is either N_T_discretization (NoCvOffset)
@@ -76,11 +76,11 @@
 
         e_min_arr::SVector{NCOMP, Float64}
 
-        # temperatures at which e(T) is tabulated, T_min_E + i * ΔT
+        # temperatures at which e(T) is tabulated, T_min_E + i * dT
         T_arr::Vector{Float64}
         T_arr_inv::Vector{Float64}
 
-        # temperatures at which c_v(T) is tabulated, T_min_c_v + i * ΔT
+        # temperatures at which c_v(T) is tabulated, T_min_c_v + i * dT
         # for NoCvOffset these alias T_arr / T_arr_inv
         T_c_arr::Vector{Float64}
         T_c_arr_inv::Vector{Float64}
@@ -103,14 +103,14 @@
                                                                       T_min = 10.0,
                                                                       T_max = 3.0e4,
                                                                       T_tol = 1e-9,
-                                                                      ΔT = 1.0) where {NCOMP}
+                                                                      dT = 1.0) where {NCOMP}
             @assert (length(mass_arr) == length(e_c_int_function_arr) == NCOMP)
 
-            n_T = trunc(Int, (T_max - T_min) / ΔT) + 1
+            n_T = trunc(Int, (T_max - T_min) / dT) + 1
             T_arr = Vector(LinRange(T_min, T_max, n_T))
-            @assert abs((T_arr[2] - T_arr[1]) - ΔT) < 1e-3
+            @assert abs((T_arr[2] - T_arr[1]) - dT) < 1e-3
 
-            inv_ΔT = 1.0 / ΔT
+            inv_dT = 1.0 / dT
 
             # Preallocate some arrays
             e_arr = zeros(n_T, NCOMP)
@@ -134,14 +134,14 @@
                     c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
 
                     int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
-                                               (c_v_a - (c_v_b - c_v_a) * T_a / ΔT) *
+                                               (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
                                                log(T_b / T_a) + (c_v_b - c_v_a)
                 end
             end
 
             T_min /= ref_q.T_ref
             T_max /= ref_q.T_ref
-            ΔT /= ref_q.T_ref
+            dT /= ref_q.T_ref
             T_arr ./= ref_q.T_ref
             T_arr_inv = 1.0 ./ T_arr
 
@@ -155,7 +155,7 @@
                        1.0 ./ mass_arr,
                        T_min, T_max,
                        T_min, T_max,
-                       ΔT, 1.0 / ΔT, T_tol,
+                       dT, 1.0 / dT, T_tol,
                        e_arr, c_v_arr,
                        (k_B ./ mass_arr) ./ ref_q.c_v_ref,
                        e_min_arr,
@@ -164,29 +164,29 @@
                        int_c_v_over_t_arr)
         end
 
-        # same as above, but c_v (and ∫ c_v / T dT) are tabulated on a grid shifted by -ΔT/2
-        # w.r.t. the energy grid: T_c_arr[i] = T_min - ΔT/2 + (i - 1) * ΔT, i = 1 ... n_T + 2
+        # same as above, but c_v (and ∫ c_v / T dT) are tabulated on a grid shifted by -dT/2
+        # w.r.t. the energy grid: T_c_arr[i] = T_min - dT/2 + (i - 1) * dT, i = 1 ... n_T + 2
         # the two extra points guarantee that [T_min, T_max] is strictly bracketed by the c_v grid
         function ThermoData1T{LinearInterpolation, CvOffset, NCOMP}(ref_q, mass_arr,
                                                                     e_c_int_function_arr;
                                                                     T_min = 10.0,
                                                                     T_max = 3.0e4,
                                                                     T_tol = 1e-9,
-                                                                    ΔT = 1.0) where {NCOMP}
+                                                                    dT = 1.0) where {NCOMP}
             @assert (length(mass_arr) == length(e_c_int_function_arr) == NCOMP)
-            # the c_v grid starts at T_min - ΔT/2, which has to stay positive for ∫ c_v / T dT
-            @assert T_min > 0.5 * ΔT
+            # the c_v grid starts at T_min - dT/2, which has to stay positive for ∫ c_v / T dT
+            @assert T_min > 0.5 * dT
 
-            n_T = trunc(Int, (T_max - T_min) / ΔT) + 1
+            n_T = trunc(Int, (T_max - T_min) / dT) + 1
             T_arr = Vector(LinRange(T_min, T_max, n_T))
-            @assert abs((T_arr[2] - T_arr[1]) - ΔT) < 1e-3
+            @assert abs((T_arr[2] - T_arr[1]) - dT) < 1e-3
 
             n_c = n_T + 2
-            T_c_min = T_min - 0.5 * ΔT
-            T_c_max = T_c_min + (n_c - 1) * ΔT
+            T_c_min = T_min - 0.5 * dT
+            T_c_max = T_c_min + (n_c - 1) * dT
             T_c_arr = Vector(LinRange(T_c_min, T_c_max, n_c))
 
-            inv_ΔT = 1.0 / ΔT
+            inv_dT = 1.0 / dT
 
             # Preallocate some arrays
             e_arr = zeros(n_T, NCOMP)
@@ -210,7 +210,7 @@
                     c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
 
                     int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
-                                               (c_v_a - (c_v_b - c_v_a) * T_a / ΔT) *
+                                               (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
                                                log(T_b / T_a) + (c_v_b - c_v_a)
                 end
             end
@@ -219,7 +219,7 @@
             T_max /= ref_q.T_ref
             T_c_min /= ref_q.T_ref
             T_c_max /= ref_q.T_ref
-            ΔT /= ref_q.T_ref
+            dT /= ref_q.T_ref
             T_arr ./= ref_q.T_ref
             T_c_arr ./= ref_q.T_ref
 
@@ -233,7 +233,7 @@
                        1.0 ./ mass_arr,
                        T_min, T_max,
                        T_c_min, T_c_max,
-                       ΔT, 1.0 / ΔT, T_tol,
+                       dT, 1.0 / dT, T_tol,
                        e_arr, c_v_arr,
                        (k_B ./ mass_arr) ./ ref_q.c_v_ref,
                        e_min_arr,
@@ -244,7 +244,7 @@
 
         function ThermoData1T(ref_q::ReferenceFlowQuantities, mass_arr,
                               e_c_int_function_arr;
-                              T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, ΔT = 1.0,
+                              T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, dT = 1.0,
                               interpolation = :linear, cv_table_offset = false)
             NCOMP = length(mass_arr)
             if interpolation == :linear
@@ -255,7 +255,7 @@
                                                                               T_min = T_min,
                                                                               T_max = T_max,
                                                                               T_tol = T_tol,
-                                                                              ΔT = ΔT)
+                                                                              dT = dT)
                 else
                     return ThermoData1T{LinearInterpolation, NoCvOffset, NCOMP}(ref_q,
                                                                                 mass_arr,
@@ -263,7 +263,7 @@
                                                                                 T_min = T_min,
                                                                                 T_max = T_max,
                                                                                 T_tol = T_tol,
-                                                                                ΔT = ΔT)
+                                                                                dT = dT)
                 end
             else
                 error("Non-linear interpolation not implemented")
@@ -286,7 +286,7 @@
                                                                                                     I,
                                                                                                     NCOMP
                                                                                                     }
-        fracpos = (T - thermodata.T_min_E) * thermodata.inv_ΔT
+        fracpos = (T - thermodata.T_min_E) * thermodata.inv_dT
         index_lower = floor(Int, fracpos)
         fracpos -= index_lower
         index_lower += 1
@@ -295,8 +295,8 @@
     end
 
     # return index and fractional position for energy and cv interpolation in case the
-    # c_v table is offset by -ΔT/2 w.r.t. the energy table
-    # the position on the c_v grid is (T - (T_min_E - ΔT/2)) / ΔT = fracpos_global + 1/2,
+    # c_v table is offset by -dT/2 w.r.t. the energy table
+    # the position on the c_v grid is (T - (T_min_E - dT/2)) / dT = fracpos_global + 1/2,
     # so it only differs from the energy one by a constant shift of 1/2 and can be obtained
     # from `fracpos` with a single comparison - no second division/floor needed
     @inline function get_index_lower_fracpos(T,
@@ -304,7 +304,7 @@
                                                                                                   I,
                                                                                                   NCOMP
                                                                                                   }
-        fracpos = (T - thermodata.T_min_E) * thermodata.inv_ΔT
+        fracpos = (T - thermodata.T_min_E) * thermodata.inv_dT
         index_lower = floor(Int, fracpos)
         fracpos -= index_lower
         index_lower += 1
@@ -373,7 +373,7 @@
     # ∫ c_v / T dT = ∫_T0^T_a c_v / T dT + ∫_T_a^T_b c_v / T dT
     # where T_b is the current temperature, T_a is the closest tabulated temperature s.t. T_a < T_b
     # ∫_T0^T_a c_v / T dT - via look-up table
-    # c_v(T) in interval is linear: c_v(T) = c_v_a + (c_v_n - c_v_a) * (T - T_a) / ΔT
+    # c_v(T) in interval is linear: c_v(T) = c_v_a + (c_v_n - c_v_a) * (T - T_a) / dT
     # c_v_n - c_v(T_a + dT) - next tabulated value
     @inline function entropy_c_v_integral_component(i_comp, index_lower_c, T_b,
                                                     thermodata::ThermoData1T{LinearInterpolation,
@@ -386,7 +386,7 @@
 
         @inbounds c_v_a = thermodata.c_v_arr[index_lower_c, i_comp]    # value of c_v at closest_T
         @inbounds slope = (thermodata.c_v_arr[index_lower_c + 1, i_comp] - c_v_a) *
-                          thermodata.inv_ΔT
+                          thermodata.inv_dT
         integrate_part = (c_v_a - slope * T_a) * log(T_b * T_a_inv) + slope * (T_b - T_a)
 
         @inbounds return thermodata.int_c_v_over_t_arr[index_lower_c, i_comp] +

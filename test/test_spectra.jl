@@ -359,13 +359,13 @@ end
         # reference quantities equal to one, i.e. scaling is the identity
         ref_q = ReferenceFlowQuantities(ntuple(_ -> 1.0, 14)...)
 
-        T_min, T_max, ΔT = 100.0, 5000.0, 10.0
+        T_min, T_max, dT = 100.0, 5000.0, 10.0
         td = ThermoData1T(ref_q, [M], [generate_e_c_vibr_iho(Θ)];
-                          T_min = T_min, T_max = T_max, ΔT = ΔT)
+                          T_min = T_min, T_max = T_max, dT = dT)
 
         # at the tabulation points linear interpolation is exact, so the table has
         # to reproduce the translational contribution plus the generated one
-        for T in (T_min, 1000.0, 2500.0, T_max - ΔT)
+        for T in (T_min, 1000.0, 2500.0, T_max - dT)
             index_e, frac_e, index_c, frac_c = get_index_lower_fracpos(T, td)
             @test frac_e≈0.0 atol=1e-12
 
