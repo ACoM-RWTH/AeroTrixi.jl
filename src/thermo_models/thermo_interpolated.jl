@@ -331,14 +331,15 @@ end
 @inline function energy_from_rho_vec(rho_vec::SVector, rho, T,
                                      thermodata::ThermoData1T{LinearInterpolation, CvO,
                                                               NCOMP}) where {CvO, NCOMP}
-    result = 0.0
+    mixture_energy = 0.0
 
     index_lower_e, fracpos_e, _, _ = get_index_lower_fracpos(T, thermodata)
     @inbounds for i in eachcomponent(thermodata)
-        result += energy_component(i, index_lower_e, fracpos_e, thermodata) * rho_vec[i]
+        mixture_energy += energy_component(i, index_lower_e, fracpos_e, thermodata) *
+                          rho_vec[i]
     end
 
-    return result / rho
+    return mixture_energy / rho
 end
 
 @inline function c_v_component(i_comp, index_lower_c, fracpos_c,
@@ -352,22 +353,23 @@ end
 # rho_inv = 1/rho
 @inline function energy(u, rho_inv, index_lower_e, fracpos_e,
                         thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
-    result = 0.0
+    mixture_energy = 0.0
     @inbounds for i in eachcomponent(thermodata)
-        result += energy_component(i, index_lower_e, fracpos_e, thermodata) * u[i + 3]
+        mixture_energy += energy_component(i, index_lower_e, fracpos_e, thermodata) *
+                          u[i + 3]
     end
-    return result * rho_inv
+    return mixture_energy * rho_inv
 end
 
 # compute specific heat capacity of flow given values of interpolation point and fractional position 
 # rho_inv = 1/rho
 @inline function c_v(u, rho_inv, index_lower_c, fracpos_c,
                      thermodata::ThermoData1T{I, CvO, NCOMP}) where {I, CvO, NCOMP}
-    result = 0.0
+    mixture_c_v = 0.0
     @inbounds for i in eachcomponent(thermodata)
-        result += c_v_component(i, index_lower_c, fracpos_c, thermodata) * u[i + 3]
+        mixture_c_v += c_v_component(i, index_lower_c, fracpos_c, thermodata) * u[i + 3]
     end
-    return result * rho_inv
+    return mixture_c_v * rho_inv
 end
 
 # compute ∫ c_v / T dT for a single component using linear interpolation
@@ -396,14 +398,15 @@ end
 
 # compute ∫ c_v / T dT of flow
 @inline function entropy_c_v_integral(u, T, rho, thermodata::ThermoData1T)
-    result = 0.0
+    mixture_c_v_integral = 0.0
 
     _, _, index_lower_c, _ = get_index_lower_fracpos(T, thermodata)
     @inbounds for i in eachcomponent(thermodata)
-        result += entropy_c_v_integral_component(i, index_lower_c, T, thermodata) *
-                  u[i + 3] / rho
+        mixture_c_v_integral += entropy_c_v_integral_component(i, index_lower_c, T,
+                                                               thermodata) *
+                                u[i + 3]
     end
-    return result
+    return mixture_c_v_integral / rho
 end
 
 # check if energy is too low, return true if it is
@@ -456,7 +459,6 @@ end
         index_lower_e, fracpos_e, index_lower_c, fracpos_c = get_index_lower_fracpos(T,
                                                                                      thermodata)
         fx = energy(u, rho_inv, index_lower_e, fracpos_e, thermodata) - e
-        # iter += 1
     end
     return T, index_lower_e, fracpos_e, index_lower_c, fracpos_c
 end
