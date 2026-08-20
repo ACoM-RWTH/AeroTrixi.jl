@@ -7,6 +7,8 @@ In the future, we plan to add more features for nonideal and rarefied gases, for
 ## Features
 
 - **Surface pressure and friction coefficients**: Compute and save pointwise aerodynamic coefficients along boundaries
+- **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
+- **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
 
 ## Installation
 
@@ -20,9 +22,12 @@ Pkg.add("AeroTrixi")
 ## Quick Start
 
 To get started, it is best to take a look at the examples.
-Currently, the only additional functionality by AeroTrixi.jl is the extended
-`AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
-such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`.
+Currently, the additional functionality provided by AeroTrixi.jl is
+
+- the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
+such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
+- the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
+- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows, which is based on tabulated thermodynamic data
 
 ## Documentation
 
@@ -33,7 +38,7 @@ See the [API Reference](@ref) for documentation on available/extended functions.
 
 ### Referencing
 
-If you use `AeroTrixi.jl` in your research, you should cite the upstream `Trixi.jl` repository
+If you use `AeroTrixi.jl` in your research, you should cite the upstream `Trixi.jl` repository:
 
 ```bibtex
 @article{ranocha2022adaptive,
@@ -81,6 +86,30 @@ In addition, you can also refer to Trixi.jl directly as
   year={2025},
   howpublished={\url{https://github.com/trixi-framework/Trixi.jl}},
   doi={10.5281/zenodo.3996439}
+}
+```
+
+If using the entropy-conservative multi-species fluxes provided with `CompressibleEulerEquationsMs1T2D`, please also cite
+```bibtex
+@article{oblapenko2025entropyconservative,
+  title={Entropy-conservative high-order methods for high-enthalpy gas flows},
+  author={Oblapenko, Georgii and Torrilhon, Manuel},
+  journal={Computers \& Fluids},
+  volume={295},
+  pages={106640},
+  year={2025},
+  publisher={Elsevier},
+  doi={10.1016/j.compfluid.2025.106640}
+}
+
+@inproceedings{oblapenko2024entropy,
+  title={Entropy-stable fluxes for high-order Discontinuous Galerkin simulations of high-enthalpy flows},
+  author={Oblapenko, Georgii and Tarnovskiy, Arseniy and Ertl, Moritz and Torrilhon, Manuel},
+  booktitle={STAB/DGLR Symposium 2024},
+  pages={393--402},
+  year={2026},
+  organization={Springer},
+  doi={10.1007/978-3-032-11115-9_36}
 }
 ```
 
