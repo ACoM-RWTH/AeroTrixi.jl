@@ -13,6 +13,7 @@ In the future, we plan to add more features for nonideal and rarefied gases, for
 ## Features
 
 - **Surface pressure and friction coefficients**: Compute and save pointwise aerodynamic coefficients along boundaries
+- **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
 
 ## Installation
 
@@ -26,9 +27,11 @@ Pkg.add("AeroTrixi")
 ## Quick Start
 
 To get started, it is best to take a look at the examples.
-Currently, the only additional functionality by AeroTrixi.jl is the extended
-`AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
-such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`.
+Currently, the additional functionality provided by AeroTrixi.jl is
+
+- the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
+such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
+- the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
 
 ## Credit
 
