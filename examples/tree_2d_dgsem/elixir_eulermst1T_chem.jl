@@ -69,7 +69,7 @@ equations = CompressibleEulerEquationsMs1T2D(REF_Q,
                                              [MASS_MOL, MASS_ATOM],
                                              [e_int_mol, e_int_atom],
                                              [c_int_mol, c_int_atom];
-                                             T_min = 10.0, T_max = 4.0e4, ΔT = 1.0,
+                                             T_min = 10.0, T_max = 4.0e4, dT = 1.0,
                                              T_tol = 1e-11, min_T_jump = 1e-6)
 
 ###############################################################################

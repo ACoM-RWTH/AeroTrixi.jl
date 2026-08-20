@@ -2,7 +2,7 @@
     @doc raw"""
         CompressibleEulerEquationsMs1T2D(ref_q, mass_arr, e_int_function, c_int_function;
                                          T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
-                                         ΔT = 1.0, min_T_jump = 1e-6,
+                                         dT = 1.0, min_T_jump = 1e-6,
                                          interpolation = :linear, cv_table_offset = false)
 
     Multicomponent compressible Euler equations in two space dimensions for a flow in
@@ -61,10 +61,10 @@
     - `e_int_function`, `c_int_function`: one callable of `T` per species returning the
       specific internal energy and specific heat of the *internal* degrees of freedom;
       the translational parts are added internally by [`ThermoData1T`](@ref).
-    - `T_min`, `T_max`, `ΔT`: tabulation range and step, in K. Temperatures are clamped
+    - `T_min`, `T_max`, `dT`: tabulation range and step, in K. Temperatures are clamped
       to ``[1.0001\,T_{\min},\; 0.9999\,T_{\max}]``.
     - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
-    - `min_T_jump`: in units of `ΔT`. Below this temperature jump `flux_oblapenko`
+    - `min_T_jump`: in units of `dT`. Below this temperature jump `flux_oblapenko`
       replaces its divided differences by the equivalent midpoint expressions, which
       avoids the ``0/0`` as ``T_{rr} \to T_{ll}``.
     - `interpolation`: only `:linear` is implemented.
@@ -92,7 +92,7 @@
                                                                         T_min = 10.0,
                                                                         T_max = 3.0e4,
                                                                         T_tol = 1e-9,
-                                                                        ΔT = 1.0,
+                                                                        dT = 1.0,
                                                                         min_T_jump = 1e-6) where {
                                                                                                   I,
                                                                                                   CvO,
@@ -104,17 +104,17 @@
 
             thermodata = ThermoData1T{I, CvO, NCOMP}(ref_q, mass_arr, e_c_int_function_arr;
                                                      T_min = T_min, T_max = T_max,
-                                                     T_tol = T_tol, ΔT = ΔT)
-            ΔT /= ref_q.T_ref
+                                                     T_tol = T_tol, dT = dT)
+            dT /= ref_q.T_ref
 
-            return new{I, CvO, NVARS, NCOMP}(min_T_jump * ΔT, thermodata)
+            return new{I, CvO, NVARS, NCOMP}(min_T_jump * dT, thermodata)
         end
 
         # Outer constructor (user-friendly)
         function CompressibleEulerEquationsMs1T2D(ref_q::ReferenceFlowQuantities,
                                                   mass_arr, e_int_function, c_int_function;
                                                   T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
-                                                  ΔT = 1.0, min_T_jump = 1e-6,
+                                                  dT = 1.0, min_T_jump = 1e-6,
                                                   interpolation = :linear,
                                                   cv_table_offset = false)
             NCOMP = length(mass_arr)
@@ -130,7 +130,7 @@
                                                                           T_min = T_min,
                                                                           T_max = T_max,
                                                                           T_tol = T_tol,
-                                                                          ΔT = ΔT)
+                                                                          dT = dT)
                 else
                     return CompressibleEulerEquationsMs1T2D{LinearInterpolation, NoCvOffset,
                                                             NVARS, NCOMP}(ref_q, mass_arr,
@@ -140,7 +140,7 @@
                                                                           T_min = T_min,
                                                                           T_max = T_max,
                                                                           T_tol = T_tol,
-                                                                          ΔT = ΔT)
+                                                                          dT = dT)
                 end
             else
                 error("Non-linear interpolation not implemented")

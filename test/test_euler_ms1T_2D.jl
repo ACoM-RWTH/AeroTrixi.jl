@@ -379,7 +379,7 @@ end
 
         eq_ms = CompressibleEulerEquationsMs1T2D(ref_q_unit, [m1, m2],
                                                  [e_int_1, e_int_2], [c_int_1, c_int_2];
-                                                 T_min = 1.0, T_max = 10001.0, ΔT = 10.0,
+                                                 T_min = 1.0, T_max = 10001.0, dT = 10.0,
                                                  min_T_jump = 1e-9)
         eq_ref = CompressibleEulerMulticomponentEquations2D(gammas = (gamma1, gamma2),
                                                             gas_constants = (R1, R2))
