@@ -80,7 +80,7 @@ e_int_f = T -> e_rot_cont(MASS, T) + e_vibr_iho(MASS, Θ_VIBR, T)
 c_int_f = T -> c_rot_cont(MASS, T) + c_vibr_iho(MASS, Θ_VIBR, T)
 
 equations = CompressibleEulerEquationsMs1T2D(REF_Q, [MASS], [e_int_f], [c_int_f];
-                                             T_min = 10.0, T_max = 4.0e4, ΔT = 1.0,
+                                             T_min = 10.0, T_max = 4.0e4, dT = 1.0,
                                              min_T_jump = 1e-5)
 
 ###############################################################################
