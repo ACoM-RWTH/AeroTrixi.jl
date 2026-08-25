@@ -316,7 +316,7 @@ end
     end
 
     @testset "no internal degrees of freedom" begin
-        @test e_c_none(M, T_LO, T_MID) == (0.0, 0.0)
+        @test e_c_none(M, T_MID) == (0.0, 0.0)
     end
 
     @testset "generated energy/specific heat functions" begin
@@ -338,19 +338,13 @@ end
                 @test f isa Function
 
                 for T in TEMPERATURES
-                    # the contract `ThermoData1T` relies on: called with a mass and
-                    # two temperatures, returning an indexable (e, c) pair
-                    res = f(M, T, T)
+                    # the assumption `ThermoData1T` relies on: called with a mass and
+                    # a temperature, returning an indexable (e, c) pair
+                    res = f(M, T)
                     @test res isa Tuple{Float64, Float64}
                     @test res[1] ≈ e_ref(M, T)
                     @test res[2] ≈ c_ref(M, T)
                 end
-
-                # energy and specific heat are evaluated at their own temperature,
-                # which is what makes the pair usable for multi-temperature models
-                e, c = f(M, T_LO, T_HI)
-                @test e ≈ e_ref(M, T_LO)
-                @test c ≈ c_ref(M, T_HI)
             end
         end
     end
