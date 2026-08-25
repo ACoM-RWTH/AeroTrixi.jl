@@ -6,7 +6,7 @@
 
 # compute specific rotational energy and specific heat of rotational degrees of freedom
 # assuming no rotational degrees of freedom
-function e_c_none(m, T_e_rot, T_c_rot)
+function e_c_none(m, T)
     return 0.0, 0.0
 end
 
@@ -26,7 +26,7 @@ end
 # assuming a continuous and fully excited spectrum
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_rot_cont()
-    return (m, T_e_rot, T_c_rot) -> (e_rot_cont(m, T_e_rot), c_rot_cont(m, T_c_rot))
+    return (m, T) -> (e_rot_cont(m, T), c_rot_cont(m, T))
 end
 
 # compute specific vibrational energy using the infinite harmonic oscillator model
@@ -44,8 +44,7 @@ end
 # returns a function computing the specific vibrational energy and specific heat of vibrational degrees of freedom using the infinite harmonic oscillator model
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_vibr_iho(Θ)
-    return (m, T_e_vibr, T_c_vibr) -> (e_vibr_iho(m, Θ, T_e_vibr),
-                                       c_vibr_iho(m, Θ, T_c_vibr))
+    return (m, T) -> (e_vibr_iho(m, Θ, T), c_vibr_iho(m, Θ, T))
 end
 
 # generate list of vibrational energies whose energy does not exceed dissociation energy
@@ -129,6 +128,6 @@ end
 # assuming a Boltzmann distribution of the vibrational energies
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_vibr_from_array(E_vibr_array_K)
-    return (m, T_e_vibr, T_c_vibr) -> (e_vibr_from_array(m, E_vibr_array_K, T_e_vibr),
-                                       c_vibr_from_array(m, E_vibr_array_K, T_c_vibr))
+    return (m, T) -> (e_vibr_from_array(m, E_vibr_array_K, T),
+                      c_vibr_from_array(m, E_vibr_array_K, T))
 end
