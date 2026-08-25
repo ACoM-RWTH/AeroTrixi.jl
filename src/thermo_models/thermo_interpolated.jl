@@ -47,7 +47,8 @@ instance `ref_q`, which is retained in the `ref_q` field.
 - `mass_arr`: species masses in kg. Not modified.
 - `e_c_int_function_arr`: one callable per species, `(m, T_e, T_c) -> (e, c_v)`,
     returning the internal-degree-of-freedom contributions only. The translational
-    parts must *not* be included.
+    parts must *not* be included. `T_e` is the temperature at which energy is computed,
+    and `T_c` is the temperature at which the specific heat is computed.
 - `T_min`, `T_max`, `dT`: tabulation range and step, in K.
 - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
 - `interpolation`: only `:linear` is implemented.
