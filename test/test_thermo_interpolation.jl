@@ -28,8 +28,8 @@ const MASSES = [4.65e-26, 5.31e-26]  # ~N2, ~O2
 const C_INT = [2.0 * k_B / MASSES[1], 1.5 * k_B / MASSES[2]]
 const C_V_TOT = [1.5 * k_B / MASSES[1] + C_INT[1], 1.5 * k_B / MASSES[2] + C_INT[2]]
 
-const E_C_FUNS = [(m, T, _) -> (C_INT[1] * T, C_INT[1]),
-    (m, T, _) -> (C_INT[2] * T, C_INT[2])]
+const E_C_FUNS = [(m, T) -> (C_INT[1] * T, C_INT[1]),
+    (m, T) -> (C_INT[2] * T, C_INT[2])]
 
 const T_MIN = 100.0
 const T_MAX = 5000.0
@@ -100,30 +100,30 @@ const B_LIN = [7.0e-4 * k_B / MASSES[1], -3.0e-4 * k_B / MASSES[2]]
 
 # the internal contribution has to exclude the translational part the table adds
 const E_C_FUNS_LIN = [
-    (m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
-                      0.5 * B_LIN[1] * T_e^2,
-                      (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
-                      B_LIN[1] * T_c),
-    (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
-                      0.5 * B_LIN[2] * T_e^2,
-                      (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
-                      B_LIN[2] * T_c)]
+    (m, T) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T +
+               0.5 * B_LIN[1] * T^2,
+               (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+               B_LIN[1] * T),
+    (m, T) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T +
+               0.5 * B_LIN[2] * T^2,
+               (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+               B_LIN[2] * T)]
 
 # c_v_i(T) = A + B T + C T^2 is *not* reproduced exactly, so the tabulated
 # integral converges to the closed form at second order in dT
 const C_QUAD = [4.0e-8 * k_B / MASSES[1], 9.0e-8 * k_B / MASSES[2]]
 
 const E_C_FUNS_QUAD = [
-    (m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
-                      0.5 * B_LIN[1] * T_e^2 +
-                      C_QUAD[1] * T_e^3 / 3,
-                      (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
-                      B_LIN[1] * T_c + C_QUAD[1] * T_c^2),
-    (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
-                      0.5 * B_LIN[2] * T_e^2 +
-                      C_QUAD[2] * T_e^3 / 3,
-                      (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
-                      B_LIN[2] * T_c + C_QUAD[2] * T_c^2)]
+    (m, T) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T +
+               0.5 * B_LIN[1] * T^2 +
+               C_QUAD[1] * T^3 / 3,
+               (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+               B_LIN[1] * T + C_QUAD[1] * T^2),
+    (m, T) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T +
+               0.5 * B_LIN[2] * T^2 +
+               C_QUAD[2] * T^3 / 3,
+               (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+               B_LIN[2] * T + C_QUAD[2] * T^2)]
 
 function build_lin(offset; step = dT)
     ThermoData1T(identity_ref_q(), copy(MASSES), E_C_FUNS_LIN;
