@@ -125,6 +125,7 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
     # or N_T_discretization+2 (CvOffset)
     e_arr::Array{Float64, 2} # Species-specific tabulated energy, N_T_discretization*NCOMP
     c_v_arr::Array{Float64, 2} # Species-specific tabulated specific heat, N_cv_discretization*NCOMP or
+    R_specific::SVector{NCOMP, Float64}  #  k_B / mass [J / kg / K] when not scaled ; component->R_specific
 
     e_min_arr::SVector{NCOMP, Float64}
 
@@ -133,6 +134,7 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
 
     # temperatures at which c_v(T) is tabulated, T_min_c_v + i * dT
     # for NoCvOffset this aliases T_arr
+    # as well as inverse of the array
     T_c_arr::Vector{Float64}
     T_c_arr_inv::Vector{Float64}
 
@@ -165,6 +167,9 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         e_min_arr = vec(minimum(e_arr, dims = 1)) ./ ref_q.e_ref
         int_c_v_over_t_arr = tabulate_int_c_v_over_t(c_v_arr, T_arr, dT, NCOMP)
 
+        # k_B / m, computed from the masses in kg, i.e. before they are rescaled below
+        R_specific = (k_B ./ mass_arr) ./ ref_q.c_v_ref
+
         T_min /= ref_q.T_ref
         T_max /= ref_q.T_ref
         dT /= ref_q.T_ref
@@ -183,6 +188,7 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
                    T_min, T_max,
                    dT, 1.0 / dT, T_tol,
                    e_arr, c_v_arr,
+                   R_specific,
                    e_min_arr,
                    T_arr,
                    T_arr, T_arr_inv,  # c_v tabulated on the same grid as e
@@ -217,6 +223,9 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         e_min_arr = vec(minimum(e_arr, dims = 1)) ./ ref_q.e_ref
         int_c_v_over_t_arr = tabulate_int_c_v_over_t(c_v_arr, T_c_arr, dT, NCOMP)
 
+        # k_B / m, computed from the masses in kg, i.e. before they are rescaled below
+        R_specific = (k_B ./ mass_arr) ./ ref_q.c_v_ref
+
         T_min /= ref_q.T_ref
         T_max /= ref_q.T_ref
         T_c_min /= ref_q.T_ref
@@ -237,6 +246,7 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
                    T_c_min, T_c_max,  # minimum and maximum temperatures for the specific heat tables
                    dT, 1.0 / dT, T_tol,  # scaled temperature step size, inverse, tolerance for Newton loop
                    e_arr, c_v_arr,  # scaled arrays of internal energies and specific heats
+                   R_specific,  # scaled array of R_specific (gas constants)
                    e_min_arr,  # per-species minimum internal energies
                    T_arr,  # scaled array of temperatures at which e is tabulated
                    T_c_arr, 1.0 ./ T_c_arr,  # scaled array of temperatures and their inverses for the specific heat tables

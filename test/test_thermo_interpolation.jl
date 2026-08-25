@@ -187,6 +187,19 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
         @test td.e_min_arr ≈ [C_V_TOT[i] * T_MIN for i in eachindex(MASSES)]
     end
 
+    @testset "R_specific" begin
+        for offset in (false, true)
+            # R_i = k_B / m_i, from the masses in kg and scaled by c_v_ref
+            td = build(identity_ref_q(), offset)
+            @test td.R_specific ≈ [k_B / MASSES[i] for i in eachindex(MASSES)]
+
+            # with c_v_ref = k_B / m_ref the scaled gas constant is 1 / m_i', which
+            # is what `get_gamma` and `pressure` use `inv_mass` for
+            td_scaled = build(scaled_ref_q(), offset)
+            @test td_scaled.R_specific ≈ td_scaled.inv_mass
+        end
+    end
+
     @testset "get_index_lower_fracpos" begin
         for offset in (false, true)
             td = build(identity_ref_q(), offset)
