@@ -53,7 +53,7 @@ with ``T`` in place of the pressure.
 All quantities are non-dimensionalised by `ref_q`, so ``k_B = 1`` in the equations
 as implemented and ``p = n T``.
 
-`flux_oblapenko` is an entropy-conservative two-point flux for this system,
+[`flux_oblapenko`](@ref) is an entropy-conservative two-point flux for this system,
 available for both an `orientation` and a `normal_direction`.
 
 # Arguments
@@ -100,6 +100,9 @@ struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
                                                                                                 NVARS,
                                                                                                 NCOMP
                                                                                                 }
+
+        # thermodata takes a single `e_c_int_function_arr`, which is a vector containing
+        # a single function per species that returns energy and specific heat
         e_c_int_function_arr = map((e_fun, c_fun) -> ((m, T, _) -> (e_fun(T), c_fun(T))),
                                     e_int_function, c_int_function)
 
