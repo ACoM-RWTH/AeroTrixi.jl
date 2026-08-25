@@ -109,9 +109,12 @@ struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
         thermodata = ThermoData1T{I, CvO, NCOMP}(ref_q, mass_arr, e_c_int_function_arr;
                                                     T_min = T_min, T_max = T_max,
                                                     T_tol = T_tol, dT = dT)
-        dT /= ref_q.T_ref
 
-        return new{I, CvO, NVARS, NCOMP}(min_T_jump * dT, thermodata)
+        # thermodata takes dimensional variables as input
+        # and the equation class needs the tolerance for the minimum allowable temperature
+        # jump for the EC fluxes, which is given in non-dimensional form,
+        # so we scale by the reference temperature
+        return new{I, CvO, NVARS, NCOMP}(min_T_jump * dT / ref_q.T_ref, thermodata)
     end
 
     # Outer constructor (user-friendly)
