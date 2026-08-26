@@ -129,5 +129,5 @@ end
 # [e] = J / kg, [c] = J / kg / K
 function generate_e_c_vibr_from_array(E_vibr_array_K)
     return (m, Tv) -> (e_vibr_from_array(m, E_vibr_array_K, Tv),
-                      c_vibr_from_array(m, E_vibr_array_K, Tv))
+                       c_vibr_from_array(m, E_vibr_array_K, Tv))
 end
