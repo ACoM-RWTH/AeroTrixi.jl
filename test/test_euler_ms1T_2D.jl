@@ -172,8 +172,8 @@ end
         for dir in directions()
             n = SVector{2}(dir ./ sqrt(dir[1]^2 + dir[2]^2))
             @test flux_oblapenko_etal(u_ll, u_rr, n,
-                                 EQUATIONS)≈flux_rotated(u_ll, u_rr, n,
-                                                         EQUATIONS) atol=1e-13
+                                      EQUATIONS)≈flux_rotated(u_ll, u_rr, n,
+                                                              EQUATIONS) atol=1e-13
         end
     end
 
@@ -192,13 +192,13 @@ end
 
         # flux_oblapenko_etal(orientation=1) must equal flux_oblapenko_etal(normal=[1,0]) etc.
         @test flux_oblapenko_etal(u_ll, u_rr, 1,
-                             EQUATIONS)≈flux_oblapenko_etal(u_ll, u_rr,
-                                                       SVector(1.0, 0.0),
-                                                       EQUATIONS) atol=1e-13
+                                  EQUATIONS)≈flux_oblapenko_etal(u_ll, u_rr,
+                                                                 SVector(1.0, 0.0),
+                                                                 EQUATIONS) atol=1e-13
         @test flux_oblapenko_etal(u_ll, u_rr, 2,
-                             EQUATIONS)≈flux_oblapenko_etal(u_ll, u_rr,
-                                                       SVector(0.0, 1.0),
-                                                       EQUATIONS) atol=1e-13
+                                  EQUATIONS)≈flux_oblapenko_etal(u_ll, u_rr,
+                                                                 SVector(0.0, 1.0),
+                                                                 EQUATIONS) atol=1e-13
 
         # consistency: equal states give the physical flux
         u = scaled_cons(4003.5, -600.0, 780.0, 22222.0, 0.35)

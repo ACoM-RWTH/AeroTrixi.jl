@@ -79,7 +79,7 @@ available for both an `orientation` and a `normal_direction`.
     [DOI: 10.1007/978-3-032-11115-9_36](https://doi.org/10.1007/978-3-032-11115-9_36)
 """
 struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
-        AbstractCompressibleEulerMulticomponentEquations{2, NVARS, NCOMP}
+       AbstractCompressibleEulerMulticomponentEquations{2, NVARS, NCOMP}
     # NVARS = NCOMP + 3 (NCOMP eqns for density + 2 for velocity and 1 for energy)
 
     min_T_jump::Float64
@@ -95,20 +95,20 @@ struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
                                                                     T_tol = 1e-9,
                                                                     dT = 1.0,
                                                                     min_T_jump = 1e-6) where {
-                                                                                                I,
-                                                                                                CvO,
-                                                                                                NVARS,
-                                                                                                NCOMP
-                                                                                                }
+                                                                                              I,
+                                                                                              CvO,
+                                                                                              NVARS,
+                                                                                              NCOMP
+                                                                                              }
 
         # thermodata takes a single `e_c_int_function_arr`, which is a vector containing
         # a single function per species that returns energy and specific heat
         e_c_int_function_arr = map((e_fun, c_fun) -> ((m, T) -> (e_fun(T), c_fun(T))),
-                                    e_int_function, c_int_function)
+                                   e_int_function, c_int_function)
 
         thermodata = ThermoData1T{I, CvO, NCOMP}(ref_q, mass_arr, e_c_int_function_arr;
-                                                    T_min = T_min, T_max = T_max,
-                                                    T_tol = T_tol, dT = dT)
+                                                 T_min = T_min, T_max = T_max,
+                                                 T_tol = T_tol, dT = dT)
 
         # thermodata takes dimensional variables as input
         # and the equation class needs the tolerance for the minimum allowable temperature
@@ -119,11 +119,11 @@ struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
 
     # Outer constructor (user-friendly)
     function CompressibleEulerEquationsMs1T2D(ref_q::ReferenceFlowQuantities,
-                                                mass_arr, e_int_function, c_int_function;
-                                                T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
-                                                dT = 1.0, min_T_jump = 1e-6,
-                                                interpolation = :linear,
-                                                cv_table_offset = false)
+                                              mass_arr, e_int_function, c_int_function;
+                                              T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
+                                              dT = 1.0, min_T_jump = 1e-6,
+                                              interpolation = :linear,
+                                              cv_table_offset = false)
         NCOMP = length(mass_arr)
         NVARS = NCOMP + 3
 
@@ -131,23 +131,23 @@ struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
             if cv_table_offset == true
                 return CompressibleEulerEquationsMs1T2D{LinearInterpolation, CvOffset,
                                                         NVARS, NCOMP}(ref_q, mass_arr,
-                                                                        e_int_function,
-                                                                        c_int_function;
-                                                                        min_T_jump = min_T_jump,
-                                                                        T_min = T_min,
-                                                                        T_max = T_max,
-                                                                        T_tol = T_tol,
-                                                                        dT = dT)
+                                                                      e_int_function,
+                                                                      c_int_function;
+                                                                      min_T_jump = min_T_jump,
+                                                                      T_min = T_min,
+                                                                      T_max = T_max,
+                                                                      T_tol = T_tol,
+                                                                      dT = dT)
             else
                 return CompressibleEulerEquationsMs1T2D{LinearInterpolation, NoCvOffset,
                                                         NVARS, NCOMP}(ref_q, mass_arr,
-                                                                        e_int_function,
-                                                                        c_int_function;
-                                                                        min_T_jump = min_T_jump,
-                                                                        T_min = T_min,
-                                                                        T_max = T_max,
-                                                                        T_tol = T_tol,
-                                                                        dT = dT)
+                                                                      e_int_function,
+                                                                      c_int_function;
+                                                                      min_T_jump = min_T_jump,
+                                                                      T_min = T_min,
+                                                                      T_max = T_max,
+                                                                      T_tol = T_tol,
+                                                                      dT = dT)
             end
         else
             error("Non-linear interpolation not implemented")
@@ -167,7 +167,7 @@ end
 
 @inline function densities(u, v, equations::CompressibleEulerEquationsMs1T2D)
     @inbounds return SVector{ncomponents(equations), real(equations)}(u[i + 3] * v
-                                                                        for i in eachcomponent(equations))
+                                                                      for i in eachcomponent(equations))
 end
 
 # Calculate total energy for a conservative state `cons`
@@ -284,7 +284,7 @@ end
     rho_v1, rho_v2, rho_e = u
 
     @inbounds prim_rho = SVector{ncomponents(equations.thermodata), Float64}(u[i + 3]
-                                                                                for i in eachcomponent(equations.thermodata))
+                                                                             for i in eachcomponent(equations.thermodata))
 
     rho = density(u, equations)
     rho_inv = 1.0 / rho
@@ -294,35 +294,35 @@ end
     e_internal = (rho_e - 0.5 * (rho_v1 * v1 + rho_v2 * v2)) * rho_inv
 
     T, index_lower_e, fracpos_e, index_lower_c, fracpos_c = temperature_rho_inv_with_index(u,
-                                                                                            rho_inv,
-                                                                                            0.28 *
-                                                                                            e_internal,
-                                                                                            e_internal,
-                                                                                            equations.thermodata)
+                                                                                           rho_inv,
+                                                                                           0.28 *
+                                                                                           e_internal,
+                                                                                           e_internal,
+                                                                                           equations.thermodata)
     prim_other = SVector{3, Float64}(v1, v2, T)
 
     # both index pairs are returned: with CvOffset the energy and the c_v tables
     # are not tabulated at the same temperatures, so they need separate stencils
     return index_lower_e, fracpos_e, index_lower_c, fracpos_c,
-            vcat(prim_other, prim_rho)
+           vcat(prim_other, prim_rho)
 end
 
 function varnames(::typeof(cons2cons),
-                    equations::CompressibleEulerEquationsMs1T2D)
+                  equations::CompressibleEulerEquationsMs1T2D)
     cons = ("rho_v1", "rho_v2", "rho_e")
     rhos = ntuple(n -> "rho" * string(n), Val(ncomponents(equations.thermodata)))
     return (cons..., rhos...)
 end
 
 function varnames(::typeof(cons2prim),
-                    equations::CompressibleEulerEquationsMs1T2D)
+                  equations::CompressibleEulerEquationsMs1T2D)
     prim = ("v1", "v2", "T")
     rhos = ntuple(n -> "rho" * string(n), Val(ncomponents(equations.thermodata)))
     return (prim..., rhos...)
 end
 
 @inline function entropy_thermodynamic(u, rho,
-                                        equations::CompressibleEulerEquationsMs1T2D)
+                                       equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     T = temperature(u, equations)
     s = entropy_c_v_integral(u, T, rho, thermodata)
@@ -359,23 +359,23 @@ end
     minus_v_half_by_T = -(v1^2 + v2^2) / 2 * T_inv
 
     index_lower_e, fracpos_e, index_lower_c, _ = get_index_lower_fracpos(T,
-                                                                            equations.thermodata)
+                                                                         equations.thermodata)
     # the `(log(rho_i) + 1) * inv_mass_i` matches d/d(rho_i) of the rho_i log(rho_i)
     # term in `entropy_math`, so these are exactly the gradient of `entropy`
     @inbounds entr_rho = SVector{ncomponents(equations.thermodata), real(equations)}(-entropy_c_v_integral_component(i,
-                                                                                                                        index_lower_c,
-                                                                                                                        T,
-                                                                                                                        equations.thermodata) +
-                                                                                        (log(abs(u[i + 3])) +
-                                                                                        1.0) *
-                                                                                        equations.thermodata.inv_mass[i] +
-                                                                                        energy_component(i,
-                                                                                                        index_lower_e,
-                                                                                                        fracpos_e,
-                                                                                                        equations.thermodata) /
-                                                                                        T +
-                                                                                        minus_v_half_by_T
-                                                                                        for i in eachcomponent(equations.thermodata))
+                                                                                                                     index_lower_c,
+                                                                                                                     T,
+                                                                                                                     equations.thermodata) +
+                                                                                     (log(abs(u[i + 3])) +
+                                                                                      1.0) *
+                                                                                     equations.thermodata.inv_mass[i] +
+                                                                                     energy_component(i,
+                                                                                                      index_lower_e,
+                                                                                                      fracpos_e,
+                                                                                                      equations.thermodata) /
+                                                                                     T +
+                                                                                     minus_v_half_by_T
+                                                                                     for i in eachcomponent(equations.thermodata))
     return vcat(entr_other, entr_rho)
 end
 
@@ -402,16 +402,16 @@ The multi-species version is also described in
   [DOI: 10.1007/978-3-032-11115-9_36](https://doi.org/10.1007/978-3-032-11115-9_36)
 """
 @inline function flux_oblapenko_etal(u_ll, u_rr, orientation::Integer,
-                                equations::CompressibleEulerEquationsMs1T2D)
+                                     equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
     # only for NoCvOffset
     # the c_v fractional positions are not needed here: the entropy integral only
     # takes the cell index, and c_v itself is only evaluated at T_mid below
     (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
-                                                                                        equations)
+                                                                                      equations)
     (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
-                                                                                        equations)
+                                                                                      equations)
 
     v1_avg = 0.5 * (v1_ll + v1_rr)
     v2_avg = 0.5 * (v2_ll + v2_rr)
@@ -424,27 +424,27 @@ The multi-species version is also described in
     tmp_sum = 0.0
     @inbounds for i in eachcomponent(thermodata)
         tmp_sum = tmp_sum +
-                    0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
 
     if (orientation == 1)
         @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
-                                                                                abs(rhos_rr[i])) *
-                                                                        v1_avg
-                                                                        for i in eachcomponent(thermodata))  #use ln_mean function in math.jl
+                                                                              abs(rhos_rr[i])) *
+                                                                      v1_avg
+                                                                      for i in eachcomponent(thermodata))  #use ln_mean function in math.jl
         fx_rhos_sum = sum(fx_rhos)
         fx_rho_v1 = v1_avg * fx_rhos_sum + tmp_sum / inv_T_avg
         fx_rho_v2 = v2_avg * fx_rhos_sum
         fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
-                0.5 * fx_rhos_sum * velocity_square_avg
+               0.5 * fx_rhos_sum * velocity_square_avg
 
         if (abs(T_jump) >= equations.min_T_jump)
             inv_T_jump = 1.0 / T_jump
             @inbounds for i in eachcomponent(thermodata)
                 cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, T_rr,
                                                                     thermodata)
-                                        -
-                                        entropy_c_v_integral_component(i, ic_ll, T_ll,
+                                     -
+                                     entropy_c_v_integral_component(i, ic_ll, T_ll,
                                                                     thermodata)) *
                                     inv_T_jump
                 e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
@@ -452,7 +452,7 @@ The multi-species version is also described in
                 cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
 
                 fx_e = fx_e +
-                        fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
+                       fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
                         T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
             end
         else
@@ -463,30 +463,30 @@ The multi-species version is also described in
             @inbounds for i in eachcomponent(thermodata)
                 cvmid = c_v_component(i, ic_mid, fc_mid, thermodata)
                 fx_e = fx_e +
-                        fx_rhos[i] *
-                        (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
-                            energy_component(i, ie_rr, fe_rr, thermodata))
+                       fx_rhos[i] *
+                       (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
+                         energy_component(i, ie_rr, fe_rr, thermodata))
                         +
                         T_geo_sqr * (cvmid * inv_T_mid - inv_T_avg * cvmid))
             end
         end
     else
         @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
-                                                                                abs(rhos_rr[i])) *
-                                                                        v2_avg
-                                                                        for i in eachcomponent(thermodata))
+                                                                              abs(rhos_rr[i])) *
+                                                                      v2_avg
+                                                                      for i in eachcomponent(thermodata))
         fx_rhos_sum = sum(fx_rhos)
         fx_rho_v2 = v2_avg * fx_rhos_sum + tmp_sum / inv_T_avg
         fx_rho_v1 = v1_avg * fx_rhos_sum
         fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
-                0.5 * fx_rhos_sum * velocity_square_avg
+               0.5 * fx_rhos_sum * velocity_square_avg
         if (abs(T_jump) >= equations.min_T_jump)
             inv_T_jump = 1.0 / T_jump
             @inbounds for i in eachcomponent(thermodata)
                 cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, T_rr,
                                                                     thermodata)
-                                        -
-                                        entropy_c_v_integral_component(i, ic_ll, T_ll,
+                                     -
+                                     entropy_c_v_integral_component(i, ic_ll, T_ll,
                                                                     thermodata)) *
                                     inv_T_jump
                 e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
@@ -495,7 +495,7 @@ The multi-species version is also described in
                 cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
 
                 fx_e += fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
-                            T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
+                         T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
             end
         else
             T_mid = 0.5 * (T_ll + T_rr)
@@ -506,9 +506,9 @@ The multi-species version is also described in
 
                 fx_e += fx_rhos[i] *
                         (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
-                            energy_component(i, ie_rr, fe_rr, thermodata))
-                            +
-                            T_geo_sqr * (cvmid * inv_T_mid - inv_T_avg * cvmid))
+                          energy_component(i, ie_rr, fe_rr, thermodata))
+                         +
+                         T_geo_sqr * (cvmid * inv_T_mid - inv_T_avg * cvmid))
             end
         end
     end
@@ -516,14 +516,14 @@ The multi-species version is also described in
 end
 
 @inline function flux_oblapenko_etal(u_ll, u_rr, normal_direction::AbstractVector,
-                                          equations::CompressibleEulerEquationsMs1T2D)
+                                     equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
     # only for NoCvOffset
     (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
-                                                                                        equations)
+                                                                                      equations)
     (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
-                                                                                        equations)
+                                                                                      equations)
 
     v1_avg = 0.5 * (v1_ll + v1_rr)
     v2_avg = 0.5 * (v2_ll + v2_rr)
@@ -539,15 +539,15 @@ end
     tmp_sum = 0.0
     @inbounds for i in eachcomponent(thermodata)
         tmp_sum = tmp_sum +
-                    0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
 
     v_dot_n_avg = 0.5 * (v_dot_n_ll + v_dot_n_rr)
 
     @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
-                                                                            abs(rhos_rr[i])) *
-                                                                    v_dot_n_avg
-                                                                    for i in eachcomponent(thermodata))
+                                                                          abs(rhos_rr[i])) *
+                                                                  v_dot_n_avg
+                                                                  for i in eachcomponent(thermodata))
     #use ln_mean function in math.jl
     fx_rhos_sum = sum(fx_rhos)
 
@@ -555,15 +555,15 @@ end
     fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg * normal_direction[1]
     fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg * normal_direction[2]
     fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
-            0.5 * fx_rhos_sum * velocity_square_avg
+           0.5 * fx_rhos_sum * velocity_square_avg
 
     if (abs(T_jump) >= equations.min_T_jump)
         inv_T_jump = 1.0 / T_jump
         @inbounds for i in eachcomponent(thermodata)
             cv_Tast_over_Tast = (entropy_c_v_integral_component(i, ic_rr, T_rr,
                                                                 thermodata)
-                                    -
-                                    entropy_c_v_integral_component(i, ic_ll, T_ll,
+                                 -
+                                 entropy_c_v_integral_component(i, ic_ll, T_ll,
                                                                 thermodata)) *
                                 inv_T_jump
 
@@ -572,7 +572,7 @@ end
             cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
 
             fx_e = fx_e +
-                    fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
+                   fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
                     T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
         end
     else
@@ -582,8 +582,8 @@ end
         @inbounds for i in eachcomponent(thermodata)
             cvmid = c_v_component(i, ic_mid, fc_mid, thermodata)
             fx_e = fx_e +
-                    fx_rhos[i] * (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
-                        energy_component(i, ie_rr, fe_rr, thermodata))
+                   fx_rhos[i] * (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
+                     energy_component(i, ie_rr, fe_rr, thermodata))
                     +
                     T_geo_sqr * (cvmid * (inv_T_mid - inv_T_avg)))
         end
@@ -592,7 +592,7 @@ end
 end
 
 @inline function flux(u, orientation::Integer,
-                        equations::CompressibleEulerEquationsMs1T2D)
+                      equations::CompressibleEulerEquationsMs1T2D)
     rho_v1, rho_v2, rho_e = u
 
     rhoinv = 1.0 / density(u, equations)
@@ -622,7 +622,7 @@ end
 
 # Calculate 1D flux for a single point
 @inline function flux(u, normal_direction::AbstractVector,
-                        equations::CompressibleEulerEquationsMs1T2D)
+                      equations::CompressibleEulerEquationsMs1T2D)
     rho_v1, rho_v2, rho_e = u
 
     rhoinv = 1.0 / density(u, equations)
@@ -647,7 +647,7 @@ end
 # sound speed of a state, given its temperature and the c_v interpolation stencil
 # c^2 = gamma * p / rho, with p = n * T (n the number density)
 @inline function sound_speed(u, rho, T, index_lower_c, fracpos_c,
-                                equations::CompressibleEulerEquationsMs1T2D)
+                             equations::CompressibleEulerEquationsMs1T2D)
     rho_inv = 1.0 / rho
     gamma = get_gamma(u, rho_inv, index_lower_c, fracpos_c, equations.thermodata)
     p = pressure(T, u, equations)
@@ -667,11 +667,11 @@ end
 end
 
 @inline function max_abs_speed(u_ll, u_rr, orientation::Integer,
-                                equations::CompressibleEulerEquationsMs1T2D)
+                               equations::CompressibleEulerEquationsMs1T2D)
     (_, _, ic_ll, fc_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
-                                                                                    equations)
+                                                                                  equations)
     (_, _, ic_rr, fc_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
-                                                                                    equations)
+                                                                                  equations)
 
     rho_ll = 0.0
     rho_rr = 0.0
@@ -698,11 +698,11 @@ end
 end
 
 @inline function max_abs_speed(u_ll, u_rr, normal_direction::AbstractVector,
-                                equations::CompressibleEulerEquationsMs1T2D)
+                               equations::CompressibleEulerEquationsMs1T2D)
     (_, _, ic_ll, fc_ll, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
-                                                                                    equations)
+                                                                                  equations)
     (_, _, ic_rr, fc_rr, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
-                                                                                    equations)
+                                                                                  equations)
 
     rho_ll = 0.0
     rho_rr = 0.0
@@ -729,7 +729,7 @@ end
 # Called inside `FluxRotated` in `numerical_fluxes.jl` so the direction
 # has been normalized prior to this rotation of the state vector
 @inline function rotate_to_x(u, normal_vector,
-                                equations::CompressibleEulerEquationsMs1T2D)
+                             equations::CompressibleEulerEquationsMs1T2D)
     # cos and sin of the angle between the x-axis and the normalized normal_vector are
     # the normalized vector's x and y coordinates respectively (see unit circle).
     c = normal_vector[1]
@@ -744,23 +744,23 @@ end
     densities = @view u[4:end]
 
     return SVector(c * u[1] + s * u[2],
-                    -s * u[1] + c * u[2],
-                    u[3],
-                    densities...)
+                   -s * u[1] + c * u[2],
+                   u[3],
+                   densities...)
 end
 
 # Called inside `FluxRotated` in `numerical_fluxes.jl` so the direction
 # has been normalized prior to this back-rotation of the state vector
 @inline function rotate_from_x(u, normal_vector,
-                                equations::CompressibleEulerEquationsMs1T2D)
+                               equations::CompressibleEulerEquationsMs1T2D)
     c = normal_vector[1]
     s = normal_vector[2]
     densities = @view u[4:end]
 
     return SVector(c * u[1] - s * u[2],
-                    s * u[1] + c * u[2],
-                    u[3],
-                    densities...)
+                   s * u[1] + c * u[2],
+                   u[3],
+                   densities...)
 end
 
 """
@@ -794,15 +794,15 @@ preserves entropy stability based on the analysis in the paper:
 Should be used together with [`UnstructuredMesh2D`](@ref), [`P4estMesh`](@ref), or [`T8codeMesh`](@ref).
 """
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
-                                                x, t,
-                                                surface_flux_function,
-                                                equations::CompressibleEulerEquationsMs1T2D)
+                                              x, t,
+                                              surface_flux_function,
+                                              equations::CompressibleEulerEquationsMs1T2D)
     norm_ = norm(normal_direction)
     # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
 
     # compute the primitive variables
     (_, _, ic, fc, (v_x, v_y, T_local, rhos_local...)) = cons2prim_with_index(u_inner,
-                                                                                equations)
+                                                                              equations)
 
     v_normal = (normal_direction[1] * v_x + normal_direction[2] * v_y) / norm_
     rho_local = 0.0
@@ -821,24 +821,24 @@ Should be used together with [`UnstructuredMesh2D`](@ref), [`P4estMesh`](@ref), 
     if v_normal <= 0.0
         sound_speed = sqrt(gamma_local * p_local / rho_local) # local sound speed
         p_star = p_local *
-                    (1 + 0.5 * (gamma_local - 1) * v_normal / sound_speed)^(2 *
-                                                                            gamma_local /
-                                                                            (gamma_local -
-                                                                            1))
+                 (1 + 0.5 * (gamma_local - 1) * v_normal / sound_speed)^(2 *
+                                                                         gamma_local /
+                                                                         (gamma_local -
+                                                                          1))
     else # v_normal > 0.0
         A = 2 / ((gamma_local + 1) * rho_local)
         B = p_local * (gamma_local - 1) / (gamma_local + 1)
         p_star = p_local +
-                    0.5 * v_normal / A *
-                    (v_normal + sqrt(v_normal^2 + 4 * A * (p_local + B)))
+                 0.5 * v_normal / A *
+                 (v_normal + sqrt(v_normal^2 + 4 * A * (p_local + B)))
     end
 
     # For the slip wall we directly set the flux as the normal velocity is zero
     # `ntuple` over a `Val` keeps this allocation-free, unlike `zeros(...)...`
     return SVector(p_star * normal_direction[1],
-                    p_star * normal_direction[2],
-                    0.0,
-                    ntuple(_ -> 0.0, Val(ncomponents(equations)))...)
+                   p_star * normal_direction[2],
+                   0.0,
+                   ntuple(_ -> 0.0, Val(ncomponents(equations)))...)
 end
 
 """
@@ -848,9 +848,9 @@ end
 Should be used together with [`TreeMesh`](@ref).
 """
 @inline function boundary_condition_slip_wall(u_inner, orientation,
-                                                direction, x, t,
-                                                surface_flux_function,
-                                                equations::CompressibleEulerEquationsMs1T2D)
+                                              direction, x, t,
+                                              surface_flux_function,
+                                              equations::CompressibleEulerEquationsMs1T2D)
 
     # println("Sflux3")
     # get the appropriate normal vector from the orientation
@@ -872,19 +872,19 @@ end
 Should be used together with [`StructuredMesh`](@ref).
 """
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
-                                                direction, x, t,
-                                                surface_flux_function,
-                                                equations::CompressibleEulerEquationsMs1T2D)
+                                              direction, x, t,
+                                              surface_flux_function,
+                                              equations::CompressibleEulerEquationsMs1T2D)
     # flip sign of normal to make it outward pointing, then flip the sign of the normal flux back
     # to be inward pointing on the -x and -y sides due to the orientation convention used by StructuredMesh
     if isodd(direction)
         boundary_flux = -boundary_condition_slip_wall(u_inner, -normal_direction,
-                                                        x, t, surface_flux_function,
-                                                        equations)
+                                                      x, t, surface_flux_function,
+                                                      equations)
     else
         boundary_flux = boundary_condition_slip_wall(u_inner, normal_direction,
-                                                        x, t, surface_flux_function,
-                                                        equations)
+                                                     x, t, surface_flux_function,
+                                                     equations)
     end
 
     return boundary_flux
