@@ -53,7 +53,7 @@ with ``T`` in place of the pressure.
 All quantities are non-dimensionalised by `ref_q`, so ``k_B = 1`` in the equations
 as implemented and ``p = n T``.
 
-[`flux_oblapenko`](@ref) is an entropy-conservative two-point flux for this system,
+[`flux_oblapenko_etal`](@ref) is an entropy-conservative two-point flux for this system,
 available for both an `orientation` and a `normal_direction`.
 
 # Arguments
@@ -65,7 +65,7 @@ available for both an `orientation` and a `normal_direction`.
 - `T_min`, `T_max`, `dT`: tabulation range and step, in K. Temperatures are clamped
     to ``[1.0001\,T_{\min},\; 0.9999\,T_{\max}]``.
 - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
-- `min_T_jump`: in units of `dT`. Below this temperature jump `flux_oblapenko`
+- `min_T_jump`: in units of `dT`. Below this temperature jump `flux_oblapenko_etal`
     replaces its divided differences by the equivalent midpoint expressions, which
     avoids the ``0/0`` as ``T_{rr} \to T_{ll}``.
 - `interpolation`: only `:linear` is implemented.
