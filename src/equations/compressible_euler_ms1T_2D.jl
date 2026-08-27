@@ -103,7 +103,7 @@ struct CompressibleEulerEquationsMs1T2D{I, CvO, NVARS, NCOMP} <:
 
         # thermodata takes a single `e_c_int_function_arr`, which is a vector containing
         # a single function per species that returns energy and specific heat
-        e_c_int_function_arr = map((e_fun, c_fun) -> ((m, T, _) -> (e_fun(T), c_fun(T))),
+        e_c_int_function_arr = map((e_fun, c_fun) -> ((m, T) -> (e_fun(T), c_fun(T))),
                                     e_int_function, c_int_function)
 
         thermodata = ThermoData1T{I, CvO, NCOMP}(ref_q, mass_arr, e_c_int_function_arr;
