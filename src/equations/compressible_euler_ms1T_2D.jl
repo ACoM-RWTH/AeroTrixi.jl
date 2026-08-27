@@ -386,7 +386,22 @@ end
 # entropy-conservative flux
 # see Oblapenko, Torrilhon, Computers and Fluids 2025 106640, DOI 10.1016/j.compfluid.2025.106640
 # and Oblapenko, Tarnovskiy, Ertl, Torrilhon, STAB/DGLR Symposium 2024, DOI 10.1007/978-3-032-11115-9_36
-@inline function flux_oblapenko(u_ll, u_rr, orientation::Integer,
+
+"""
+    flux_oblapenko_etal(u_ll, u_rr, orientation_or_normal_direction,
+                        equations::CompressibleEulerEquationsMs1T2D)
+
+This flux is the multi-species entropy-conservative flux described in
+- Georgii Oblapenko, Manuel Torrilhon (2025)
+  Entropy-conservative high-order methods for high-enthalpy gas flows
+  [DOI: 10.1016/j.compfluid.2025.106640](https://doi.org/10.1016/j.compfluid.2025.106640)
+
+The multi-species version is also described in
+- Georgii Oblapenko, Arseniy Tarnovskiy, Moritz Ertl, Manuel Torrilhon (2026)
+  Entropy-Stable Fluxes for High-Order Discontinuous Galerkin Simulations of High-Enthalpy Flows
+  [DOI: 10.1007/978-3-032-11115-9_36](https://doi.org/10.1007/978-3-032-11115-9_36)
+"""
+@inline function flux_oblapenko_etal(u_ll, u_rr, orientation::Integer,
                                 equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
@@ -500,8 +515,8 @@ end
     return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
 end
 
-@inline function flux_oblapenko(u_ll, u_rr, normal_direction::AbstractVector,
-                                equations::CompressibleEulerEquationsMs1T2D)
+@inline function flux_oblapenko_eta(u_ll, u_rr, normal_direction::AbstractVector,
+                                          equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
     # only for NoCvOffset
@@ -748,34 +763,48 @@ end
                     densities...)
 end
 
+"""
+    boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
+                                 x, t,
+                                 surface_flux_function,
+                                 equations::CompressibleEulerEquationsMs1T2D)
+
+Determine the boundary numerical surface flux for a slip wall condition.
+Imposes a zero normal velocity at the wall.
+Density is taken from the internal solution state and pressure is computed as an
+exact solution of a 1D Riemann problem. Further details about this boundary state
+are available in the paper:
+- J. J. W. van der Vegt and H. van der Ven (2002)
+  Slip flow boundary conditions in discontinuous Galerkin discretizations of
+  the Euler equations of gas dynamics
+  [PDF](https://reports.nlr.nl/bitstream/handle/10921/692/TP-2002-300.pdf?sequence=1)
+
+Details about the 1D pressure Riemann solution can be found in Section 6.3.3 of the book
+- Eleuterio F. Toro (2009)
+  Riemann Solvers and Numerical Methods for Fluid Dynamics: A Practical Introduction
+  3rd edition
+  [DOI: 10.1007/b79761](https://doi.org/10.1007/b79761)
+
+The implementation is modified to ensure non-negativity of `p_star`. This modification
+preserves entropy stability based on the analysis in the paper:
+- F. J. Hindenlang, G. J. Gassner, D. A. Kopriva (2020)
+  Stability of wall boundary condition procedures for discontinuous Galerkin spectral element approximations of the compressible Euler equations
+  [DOI: 10.1007/978-3-030-39647-3_1](https://doi.org/10.1007/978-3-030-39647-3_1)
+
+Should be used together with [`UnstructuredMesh2D`](@ref), [`P4estMesh`](@ref), or [`T8codeMesh`](@ref).
+"""
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
                                                 x, t,
                                                 surface_flux_function,
                                                 equations::CompressibleEulerEquationsMs1T2D)
     norm_ = norm(normal_direction)
     # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
-    # normal = normal_direction / norm_
-
-    # rotate the internal solution state
-    # u_local = Trixi.rotate_to_x(u_inner, normal, equations)
 
     # compute the primitive variables
-    # rho_local, v_normal, v_tangent, p_local, T_local = cons2prim(u_local, equations)
     (_, _, ic, fc, (v_x, v_y, T_local, rhos_local...)) = cons2prim_with_index(u_inner,
                                                                                 equations)
 
-    # c = normal_vector[1]
-    # s = normal_vector[2]
-
-    # # Apply the 2D rotation matrix with normal and tangent directions of the form
-    # # [ 1    0    0   0;
-    # #   0   n_1  n_2  0;
-    # #   0   t_1  t_2  0;
-    # #   0    0    0   1 ]
-    # # where t_1 = -n_2 and t_2 = n_1
-
     v_normal = (normal_direction[1] * v_x + normal_direction[2] * v_y) / norm_
-    # rho_local = sum(rhos_local)
     rho_local = 0.0
     @inbounds for i in eachcomponent(equations)
         rho_local += rhos_local[i]
@@ -783,6 +812,7 @@ end
     gamma_local = get_gamma(u_inner, 1.0 / rho_local, ic, fc, equations.thermodata)
 
     p_local = pressure(T_local, u_inner, equations)
+
     # Get the solution of the pressure Riemann problem
     # See Section 6.3.3 of
     # Eleuterio F. Toro (2009)

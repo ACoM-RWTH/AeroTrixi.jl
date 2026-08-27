@@ -187,7 +187,7 @@ boundary_conditions = (; x_neg = boundary_condition_supersonic_inflow, # outer/s
 # solver
 
 surface_flux = FluxLaxFriedrichs(max_abs_speed)
-volume_flux = flux_oblapenko
+volume_flux = flux_oblapenko_etal
 
 basis = LobattoLegendreBasis(polydeg)
 

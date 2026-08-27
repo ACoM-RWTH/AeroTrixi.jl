@@ -31,7 +31,7 @@ isdir(outdir) && rm(outdir, recursive = true)
                             ],
                             tspan=(0.0, 0.1))
 
-        # Entropy conservation of the semidiscretization: with `flux_oblapenko` used
+        # Entropy conservation of the semidiscretization: with `flux_oblapenko_etal` used
         # as both the volume and the surface flux, ∑∂S/∂U ⋅ Uₜ vanishes up to
         # round-off. This is a property of the spatial discretization alone, so it
         # holds at any state and does not depend on the time integration scheme.

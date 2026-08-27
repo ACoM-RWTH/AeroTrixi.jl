@@ -9,7 +9,7 @@ using AeroTrixi
 using AeroTrixi: CompressibleEulerEquationsMs1T2D, ReferenceFlowQuantities, k_B,
                  e_rot_cont, c_rot_cont, e_vibr_iho, c_vibr_iho,
                  cons2prim_with_index, get_index_lower_fracpos, get_gamma,
-                 energy_internal, energy_kinetic, flux_oblapenko, SVector
+                 energy_internal, energy_kinetic, flux_oblapenko_etal, SVector
 
 using Trixi: entropy, entropy_math, entropy_thermodynamic, cons2entropy, total_entropy
 
@@ -152,7 +152,7 @@ end
     end
 
     # --------------------------------------------------------------------------
-    # `flux_oblapenko` is the entropy-conservative two-point flux. `FluxRotated`
+    # `flux_oblapenko_etal` is the entropy-conservative two-point flux. `FluxRotated`
     # evaluates it in a frame rotated so the normal points along x, using the
     # `rotate_to_x` / `rotate_from_x` we provide; the direct normal-direction
     # method must reproduce that for every direction.
@@ -163,15 +163,15 @@ end
                     [0.2, 0.8], [-0.2, 0.8], [0.2, -0.8], [-0.2, -0.8],
                     [0.35, 0.7], [-0.35, 0.7], [0.35, -0.7], [-0.35, -0.7])
 
-    @testset "flux_oblapenko is rotationally invariant" begin
-        flux_rotated = FluxRotated(flux_oblapenko)
+    @testset "flux_oblapenko_etal is rotationally invariant" begin
+        flux_rotated = FluxRotated(flux_oblapenko_etal)
 
         u_ll = scaled_cons(4003.5, -600.0, 780.0, 22222.0, 0.35)
         u_rr = scaled_cons(5200.5, -750.0, 858.0, 18000.0, 0.55)
 
         for dir in directions()
             n = SVector{2}(dir ./ sqrt(dir[1]^2 + dir[2]^2))
-            @test flux_oblapenko(u_ll, u_rr, n,
+            @test flux_oblapenko_etal(u_ll, u_rr, n,
                                  EQUATIONS)≈flux_rotated(u_ll, u_rr, n,
                                                          EQUATIONS) atol=1e-13
         end
@@ -190,25 +190,25 @@ end
         u_ll = scaled_cons(4003.5, -600.0, 780.0, 22222.0, 0.35)
         u_rr = scaled_cons(5200.5, -750.0, 858.0, 18000.0, 0.55)
 
-        # flux_oblapenko(orientation=1) must equal flux_oblapenko(normal=[1,0]) etc.
-        @test flux_oblapenko(u_ll, u_rr, 1,
-                             EQUATIONS)≈flux_oblapenko(u_ll, u_rr,
+        # flux_oblapenko_etal(orientation=1) must equal flux_oblapenko_etal(normal=[1,0]) etc.
+        @test flux_oblapenko_etal(u_ll, u_rr, 1,
+                             EQUATIONS)≈flux_oblapenko_etal(u_ll, u_rr,
                                                        SVector(1.0, 0.0),
                                                        EQUATIONS) atol=1e-13
-        @test flux_oblapenko(u_ll, u_rr, 2,
-                             EQUATIONS)≈flux_oblapenko(u_ll, u_rr,
+        @test flux_oblapenko_etal(u_ll, u_rr, 2,
+                             EQUATIONS)≈flux_oblapenko_etal(u_ll, u_rr,
                                                        SVector(0.0, 1.0),
                                                        EQUATIONS) atol=1e-13
 
         # consistency: equal states give the physical flux
         u = scaled_cons(4003.5, -600.0, 780.0, 22222.0, 0.35)
-        @test flux_oblapenko(u, u, 1, EQUATIONS)≈flux(u, 1, EQUATIONS) atol=1e-10
-        @test flux_oblapenko(u, u, 2, EQUATIONS)≈flux(u, 2, EQUATIONS) atol=1e-10
+        @test flux_oblapenko_etal(u, u, 1, EQUATIONS)≈flux(u, 1, EQUATIONS) atol=1e-10
+        @test flux_oblapenko_etal(u, u, 2, EQUATIONS)≈flux(u, 2, EQUATIONS) atol=1e-10
     end
 
     # --------------------------------------------------------------------------
     # Entropy variables and entropy conservation. `cons2entropy` is the gradient of
-    # `entropy`, and `flux_oblapenko` conserves that entropy.
+    # `entropy`, and `flux_oblapenko_etal` conserves that entropy.
     # --------------------------------------------------------------------------
     @testset "entropy variables and conservation" begin
         states = (scaled_cons(2000.0, 0.3, -0.2, 20000.0, 0.35),
@@ -251,7 +251,7 @@ end
             end
         end
 
-        @testset "flux_oblapenko is entropy conservative" begin
+        @testset "flux_oblapenko_etal is entropy conservative" begin
             # Tadmor condition: (w_ll - w_rr) . f* = psi_ll - psi_rr, with the
             # entropy-flux potential psi_j = w . f_phys_j - v_j * entropy
             function psi(u, orientation)
@@ -265,7 +265,7 @@ end
                      (states[2], states[3]),
                      (states[1], states[1] .* 1.0000003))  # tiny jump, midpoint branch
             for (u_ll, u_rr) in pairs, orientation in (1, 2)
-                fstar = flux_oblapenko(u_ll, u_rr, orientation, EQUATIONS)
+                fstar = flux_oblapenko_etal(u_ll, u_rr, orientation, EQUATIONS)
                 lhs = sum((cons2entropy(u_ll, EQUATIONS) .- cons2entropy(u_rr, EQUATIONS)) .*
                           fstar)
                 rhs = psi(u_ll, orientation) - psi(u_rr, orientation)
@@ -275,7 +275,7 @@ end
     end
 
     # --------------------------------------------------------------------------
-    # For a calorically perfect gas (constant c_v) `flux_oblapenko` reduces to the
+    # For a calorically perfect gas (constant c_v) `flux_oblapenko_etal` reduces to the
     # entropy-conservative flux of a fixed-gamma gas, so it must reproduce Trixi's
     # `flux_chandrashekar` for the equivalent ideal-gas equations.
     #
@@ -330,14 +330,14 @@ end
             r_ll, r_rr = to_ref(u_ll), to_ref(u_rr)
 
             for orientation in (1, 2)
-                f_ms = flux_oblapenko(u_ll, u_rr, orientation, eq_ms_1sp)
+                f_ms = flux_oblapenko_etal(u_ll, u_rr, orientation, eq_ms_1sp)
                 f_ref = flux_chandrashekar(r_ll, r_rr, orientation, eq_ref_1sp)
                 @test from_ms(f_ms)≈f_ref rtol=1e-11
             end
 
             for dir in ([1.0, 0.0], [0.35, 0.7], [-0.6, 0.8])
                 n = SVector{2}(dir ./ sqrt(dir[1]^2 + dir[2]^2))
-                f_ms = flux_oblapenko(u_ll, u_rr, n, eq_ms_1sp)
+                f_ms = flux_oblapenko_etal(u_ll, u_rr, n, eq_ms_1sp)
                 f_ref = flux_chandrashekar(r_ll, r_rr, n, eq_ref_1sp)
                 @test from_ms(f_ms)≈f_ref rtol=1e-11
             end
@@ -349,7 +349,7 @@ end
             u_rr = ms_state(6000.0, 0.1, 0.4, (0.9, 0.3), (cv1, cv2))
 
             for orientation in (1, 2)
-                f_ms = flux_oblapenko(u_ll, u_rr, orientation, eq_ms_mc)
+                f_ms = flux_oblapenko_etal(u_ll, u_rr, orientation, eq_ms_mc)
                 f_ref = flux_chandrashekar(u_ll, u_rr, orientation, eq_ref_mc)
                 @test f_ms≈f_ref rtol=1e-11
             end

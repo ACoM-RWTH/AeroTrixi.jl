@@ -144,8 +144,8 @@ end
 
 polydeg = 3
 
-volume_flux = flux_oblapenko
-surface_flux = flux_oblapenko
+volume_flux = flux_oblapenko_etal
+surface_flux = flux_oblapenko_etal
 
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
