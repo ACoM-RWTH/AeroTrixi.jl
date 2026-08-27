@@ -51,7 +51,7 @@ include("auxiliary.jl")
 
 include("callbacks_step/callbacks_step.jl")
 include("thermo_models/thermo_models.jl")
-include("equations/compressible_euler_ms1T_2D.jl")
+include("equations/equations.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        AnalysisCallback,
