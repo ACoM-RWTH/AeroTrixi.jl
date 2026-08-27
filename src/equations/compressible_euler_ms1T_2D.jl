@@ -515,7 +515,7 @@ The multi-species version is also described in
     return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
 end
 
-@inline function flux_oblapenko_eta(u_ll, u_rr, normal_direction::AbstractVector,
+@inline function flux_oblapenko_etal(u_ll, u_rr, normal_direction::AbstractVector,
                                           equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
