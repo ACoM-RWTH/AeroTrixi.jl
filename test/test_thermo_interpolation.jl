@@ -28,8 +28,8 @@ const MASSES = [4.65e-26, 5.31e-26]  # ~N2, ~O2
 const C_INT = [2.0 * k_B / MASSES[1], 1.5 * k_B / MASSES[2]]
 const C_V_TOT = [1.5 * k_B / MASSES[1] + C_INT[1], 1.5 * k_B / MASSES[2] + C_INT[2]]
 
-const E_C_FUNS = [(m, T, _) -> (C_INT[1] * T, C_INT[1]),
-    (m, T, _) -> (C_INT[2] * T, C_INT[2])]
+const E_C_FUNS = [(m, T) -> (C_INT[1] * T, C_INT[1]),
+    (m, T) -> (C_INT[2] * T, C_INT[2])]
 
 const T_MIN = 100.0
 const T_MAX = 5000.0
@@ -100,30 +100,30 @@ const B_LIN = [7.0e-4 * k_B / MASSES[1], -3.0e-4 * k_B / MASSES[2]]
 
 # the internal contribution has to exclude the translational part the table adds
 const E_C_FUNS_LIN = [
-    (m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
-                      0.5 * B_LIN[1] * T_e^2,
-                      (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
-                      B_LIN[1] * T_c),
-    (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
-                      0.5 * B_LIN[2] * T_e^2,
-                      (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
-                      B_LIN[2] * T_c)]
+    (m, T) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T +
+               0.5 * B_LIN[1] * T^2,
+               (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+               B_LIN[1] * T),
+    (m, T) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T +
+               0.5 * B_LIN[2] * T^2,
+               (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+               B_LIN[2] * T)]
 
 # c_v_i(T) = A + B T + C T^2 is *not* reproduced exactly, so the tabulated
 # integral converges to the closed form at second order in dT
 const C_QUAD = [4.0e-8 * k_B / MASSES[1], 9.0e-8 * k_B / MASSES[2]]
 
 const E_C_FUNS_QUAD = [
-    (m, T_e, T_c) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T_e +
-                      0.5 * B_LIN[1] * T_e^2 +
-                      C_QUAD[1] * T_e^3 / 3,
-                      (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
-                      B_LIN[1] * T_c + C_QUAD[1] * T_c^2),
-    (m, T_e, T_c) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T_e +
-                      0.5 * B_LIN[2] * T_e^2 +
-                      C_QUAD[2] * T_e^3 / 3,
-                      (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
-                      B_LIN[2] * T_c + C_QUAD[2] * T_c^2)]
+    (m, T) -> ((A_LIN[1] - 1.5 * k_B / MASSES[1]) * T +
+               0.5 * B_LIN[1] * T^2 +
+               C_QUAD[1] * T^3 / 3,
+               (A_LIN[1] - 1.5 * k_B / MASSES[1]) +
+               B_LIN[1] * T + C_QUAD[1] * T^2),
+    (m, T) -> ((A_LIN[2] - 1.5 * k_B / MASSES[2]) * T +
+               0.5 * B_LIN[2] * T^2 +
+               C_QUAD[2] * T^3 / 3,
+               (A_LIN[2] - 1.5 * k_B / MASSES[2]) +
+               B_LIN[2] * T + C_QUAD[2] * T^2)]
 
 function build_lin(offset; step = dT)
     ThermoData1T(identity_ref_q(), copy(MASSES), E_C_FUNS_LIN;
@@ -185,6 +185,19 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
         @test length(td.e_min_arr) == length(MASSES)
         # e_i(T) is increasing, so the minimum is attained at T_min
         @test td.e_min_arr ≈ [C_V_TOT[i] * T_MIN for i in eachindex(MASSES)]
+    end
+
+    @testset "R_specific" begin
+        for offset in (false, true)
+            # R_i = k_B / m_i, from the masses in kg and scaled by c_v_ref
+            td = build(identity_ref_q(), offset)
+            @test td.R_specific ≈ [k_B / MASSES[i] for i in eachindex(MASSES)]
+
+            # with c_v_ref = k_B / m_ref the scaled gas constant is 1 / m_i', which
+            # is what `get_gamma` and `pressure` use `inv_mass` for
+            td_scaled = build(scaled_ref_q(), offset)
+            @test td_scaled.R_specific ≈ td_scaled.inv_mass
+        end
     end
 
     @testset "get_index_lower_fracpos" begin

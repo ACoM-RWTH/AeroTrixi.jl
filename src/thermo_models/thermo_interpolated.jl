@@ -1,5 +1,57 @@
 @muladd begin
 #! format: noindent
+
+# tabulate e(T) and c_v(T) of a single species on `T_grid`, adding the translational
+# contributions the caller-supplied `f` is required to leave out
+# f takes in the species' mass and a temperature and returns the
+# internal energy and specific heat of the internal degrees of freedom
+function tabulate_species!(e_col, c_v_col, m, f, T_grid)
+    @inbounds for i in eachindex(T_grid)
+        T = T_grid[i]
+        e_int, c_int = f(m, T)
+        e_col[i] = (3.0 / 2.0) * k_B * T / m + e_int
+        c_v_col[i] = (3.0 / 2.0) * k_B / m + c_int
+    end
+    return nothing
+end
+
+# tabulate e(T) and c_v(T) of every species on `T_grid`, one sweep per species
+# both tables are length(T_grid) * NCOMP; callers that only need one of them
+# (the c_v discretization grid is not the energy grid for `CvOffset`) discard the other
+function tabulate_e_c(mass_arr, e_c_int_function_arr, T_grid, NCOMP)
+    n = length(T_grid)
+    e_arr = zeros(n, NCOMP)
+    c_v_arr = zeros(n, NCOMP)
+
+    for j in 1:NCOMP
+        tabulate_species!(view(e_arr, :, j), view(c_v_arr, :, j),
+                          mass_arr[j], e_c_int_function_arr[j], T_grid)
+    end
+
+    return e_arr, c_v_arr
+end
+
+# accumulate ∫ c_v / T dT over the points of the c_v grid, c_v being linear in each
+# cell; the partial cell beyond the last grid point is added by
+# `entropy_c_v_integral_component`
+function tabulate_int_c_v_over_t(c_v_arr, T_c_grid, dT, NCOMP)
+    n = length(T_c_grid)
+    int_c_v_over_t_arr = zeros(n, NCOMP)
+
+    @inbounds for j in 1:NCOMP
+        for i in 2:n
+            T_a, T_b = T_c_grid[i - 1], T_c_grid[i]
+            c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
+
+            int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
+                                       (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
+                                       log(T_b / T_a) + (c_v_b - c_v_a)
+        end
+    end
+
+    return int_c_v_over_t_arr
+end
+
 @doc raw"""
     ThermoData1T(ref_q, mass_arr, e_c_int_function_arr;
                  T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9, dT = 1.0,
@@ -45,10 +97,9 @@ instance `ref_q`, which is retained in the `ref_q` field.
 # Arguments
 - `ref_q`: `ReferenceFlowQuantities` used to non-dimensionalise every table.
 - `mass_arr`: species masses in kg. Not modified.
-- `e_c_int_function_arr`: one callable per species, `(m, T_e, T_c) -> (e, c_v)`,
-    returning the internal-degree-of-freedom contributions only. The translational
-    parts must *not* be included. `T_e` is the temperature at which energy is computed,
-    and `T_c` is the temperature at which the specific heat is computed.
+- `e_c_int_function_arr`: one callable per species, `(m, T) -> (e, c_v)`, returning
+    the internal-degree-of-freedom contributions only. The translational parts must
+    *not* be included.
 - `T_min`, `T_max`, `dT`: tabulation range and step, in K.
 - `T_tol`: relative tolerance of the Newton solver for ``T(e)``.
 - `interpolation`: only `:linear` is implemented.
@@ -80,10 +131,10 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
 
     # temperatures at which e(T) is tabulated, T_min_E + i * dT
     T_arr::Vector{Float64}
-    T_arr_inv::Vector{Float64}
 
     # temperatures at which c_v(T) is tabulated, T_min_c_v + i * dT
-    # for NoCvOffset these alias T_arr / T_arr_inv
+    # for NoCvOffset this aliases T_arr
+    # as well as inverse of the array
     T_c_arr::Vector{Float64}
     T_c_arr_inv::Vector{Float64}
 
@@ -93,10 +144,9 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
     # construct a `ThermoData1T` instance for a flow with NCOMP species
     # using a ReferenceFlowQuantities instance for scaling
     # `mass_arr` is the array of the species' molecular/atomic masses in kg
-    # `e_c_int_function_arr` is an array of NCOMP tuples/arrays of functions
+    # `e_c_int_function_arr` is an array of NCOMP functions
     # each of which computes the specific internal energy and specific heat
-    # given a value of the species' mass and two temperatures at which to compute
-    # the energy and specific heat
+    # given a value of the species' mass and the temperature
     # the energy and specific heats of the translational degrees of freedom are
     # account for inside the code and should not be part of the computations in
     # e_c_int_function_arr
@@ -112,34 +162,13 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         T_arr = Vector(LinRange(T_min, T_max, n_T))
         @assert abs((T_arr[2] - T_arr[1]) - dT) < 1e-3
 
-        inv_dT = 1.0 / dT
-
-        # Preallocate some arrays
-        e_arr = zeros(n_T, NCOMP)
-        c_v_arr = zeros(n_T, NCOMP)
-        R_specific = zeros(NCOMP)
-        e_min_arr = zeros(NCOMP)
-        int_c_v_over_t_arr = zeros(n_T, NCOMP)
-
-        e_arr = map((m, f) -> map(t -> 3.0 / 2.0 * k_B * t / m .+ f(m, t, t)[1], T_arr),
-                    mass_arr, e_c_int_function_arr)
-        e_arr = transpose(stack(e_arr, dims = 1))
+        # e and c_v share the grid here, so a single sweep fills both tables
+        e_arr, c_v_arr = tabulate_e_c(mass_arr, e_c_int_function_arr, T_arr, NCOMP)
         e_min_arr = vec(minimum(e_arr, dims = 1)) ./ ref_q.e_ref
-        c_v_arr = transpose(stack(map((m, f) -> (map(t -> f(m, t, t)[2], T_arr) .+
-                                                 ((3.0 / 2.0) * k_B / m)), mass_arr,
-                                      e_c_int_function_arr), dims = 1))
+        int_c_v_over_t_arr = tabulate_int_c_v_over_t(c_v_arr, T_arr, dT, NCOMP)
 
-        @inbounds for j in 1:NCOMP
-            # Integrate ∫ c_v / T dT
-            for i in 2:n_T
-                T_a, T_b = T_arr[i - 1], T_arr[i]
-                c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
-
-                int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
-                                           (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
-                                           log(T_b / T_a) + (c_v_b - c_v_a)
-            end
-        end
+        # k_B / m, computed from the masses in kg, i.e. before they are rescaled below
+        R_specific = (k_B ./ mass_arr) ./ ref_q.c_v_ref
 
         T_min /= ref_q.T_ref
         T_max /= ref_q.T_ref
@@ -159,9 +188,9 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
                    T_min, T_max,
                    dT, 1.0 / dT, T_tol,
                    e_arr, c_v_arr,
-                   (k_B ./ mass_arr) ./ ref_q.c_v_ref,
+                   R_specific,
                    e_min_arr,
-                   T_arr, T_arr_inv,
+                   T_arr,
                    T_arr, T_arr_inv,  # c_v tabulated on the same grid as e
                    int_c_v_over_t_arr)
     end
@@ -188,34 +217,14 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
         T_c_max = T_c_min + (n_c - 1) * dT
         T_c_arr = Vector(LinRange(T_c_min, T_c_max, n_c))
 
-        inv_dT = 1.0 / dT
-
-        # Preallocate some arrays
-        e_arr = zeros(n_T, NCOMP)
-        c_v_arr = zeros(n_c, NCOMP)
-        R_specific = zeros(NCOMP)
-        e_min_arr = zeros(NCOMP)
-        int_c_v_over_t_arr = zeros(n_c, NCOMP)
-
-        e_arr = map((m, f) -> map(t -> 3.0 / 2.0 * k_B * t / m .+ f(m, t, t)[1], T_arr),
-                    mass_arr, e_c_int_function_arr)
-        e_arr = transpose(stack(e_arr, dims = 1))
+        # the two grids differ, so e and c_v need a sweep each
+        e_arr, _ = tabulate_e_c(mass_arr, e_c_int_function_arr, T_arr, NCOMP)
+        _, c_v_arr = tabulate_e_c(mass_arr, e_c_int_function_arr, T_c_arr, NCOMP)
         e_min_arr = vec(minimum(e_arr, dims = 1)) ./ ref_q.e_ref
-        c_v_arr = transpose(stack(map((m, f) -> (map(t -> f(m, t, t)[2], T_c_arr) .+
-                                                 ((3.0 / 2.0) * k_B / m)), mass_arr,
-                                      e_c_int_function_arr), dims = 1))
+        int_c_v_over_t_arr = tabulate_int_c_v_over_t(c_v_arr, T_c_arr, dT, NCOMP)
 
-        @inbounds for j in 1:NCOMP
-            # Integrate ∫ c_v / T dT on the c_v grid
-            for i in 2:n_c
-                T_a, T_b = T_c_arr[i - 1], T_c_arr[i]
-                c_v_a, c_v_b = c_v_arr[i - 1, j], c_v_arr[i, j]
-
-                int_c_v_over_t_arr[i, j] = int_c_v_over_t_arr[i - 1, j] +
-                                           (c_v_a - (c_v_b - c_v_a) * T_a / dT) *
-                                           log(T_b / T_a) + (c_v_b - c_v_a)
-            end
-        end
+        # k_B / m, computed from the masses in kg, i.e. before they are rescaled below
+        R_specific = (k_B ./ mass_arr) ./ ref_q.c_v_ref
 
         T_min /= ref_q.T_ref
         T_max /= ref_q.T_ref
@@ -237,9 +246,9 @@ struct ThermoData1T{I <: Interpolation, CvO <: CvTableOffset, NCOMP} <: ThermoDa
                    T_c_min, T_c_max,  # minimum and maximum temperatures for the specific heat tables
                    dT, 1.0 / dT, T_tol,  # scaled temperature step size, inverse, tolerance for Newton loop
                    e_arr, c_v_arr,  # scaled arrays of internal energies and specific heats
-                   (k_B ./ mass_arr) ./ ref_q.c_v_ref,  # scaled array of R_specific (gas constants)
+                   R_specific,  # scaled array of R_specific (gas constants)
                    e_min_arr,  # per-species minimum internal energies
-                   T_arr, 1.0 ./ T_arr,  # scaled array of temperatures and their inverses
+                   T_arr,  # scaled array of temperatures at which e is tabulated
                    T_c_arr, 1.0 ./ T_c_arr,  # scaled array of temperatures and their inverses for the specific heat tables
                    int_c_v_over_t_arr)  # integral of c_v(T)/T used for computation of entropy
     end
