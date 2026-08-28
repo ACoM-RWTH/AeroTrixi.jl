@@ -852,7 +852,6 @@ Should be used together with [`TreeMesh`](@ref).
                                               surface_flux_function,
                                               equations::CompressibleEulerEquationsMs1T2D)
 
-    # println("Sflux3")
     # get the appropriate normal vector from the orientation
     if orientation == 1
         normal_direction = SVector(1, 0)
