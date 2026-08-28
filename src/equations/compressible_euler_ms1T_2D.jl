@@ -2,9 +2,9 @@
 #! format: noindent
 @doc raw"""
     CompressibleEulerEquationsMs1T2D(ref_q, mass_arr, e_int_function, c_int_function;
-                                        T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
-                                        dT = 1.0, min_T_jump = 1e-6,
-                                        interpolation = :linear, cv_table_offset = false)
+                                     T_min = 10.0, T_max = 3.0e4, T_tol = 1e-9,
+                                     dT = 1.0, min_T_jump = 1e-6,
+                                     interpolation = :linear, cv_table_offset = false)
 
 Multicomponent compressible Euler equations in two space dimensions for a flow in
 thermal equilibrium, i.e. a single temperature ``T`` shared by all degrees of
