@@ -12,6 +12,8 @@ using Trixi: @printf, @sprintf, print_level_information,
              DiscreteCallback, SolutionAnalyzer,
              create_cache_analysis, summary_box, ncalls,
              AbstractEquations, AbstractEquationsParabolic, AbstractSemidiscretization,
+             AbstractCompressibleEulerMulticomponentEquations,
+             ln_mean,
              mesh_equations_solver_cache, get_tmp_cache,
              wrap_array,
              derivative_discontinuity!, isfinished,
@@ -29,7 +31,14 @@ using Trixi: @printf, @sprintf, print_level_information,
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
-              initialize!
+              initialize!,
+              varnames, cons2prim, prim2cons, cons2entropy,
+              density, pressure, temperature, density_pressure,
+              energy_total, energy_kinetic, energy_internal,
+              entropy, entropy_math, entropy_thermodynamic,
+              ncomponents, eachcomponent,
+              flux, max_abs_speed, max_abs_speeds,
+              boundary_condition_slip_wall, rotate_to_x, rotate_from_x
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
@@ -42,6 +51,7 @@ include("auxiliary.jl")
 
 include("callbacks_step/callbacks_step.jl")
 include("thermo_models/thermo_models.jl")
+include("equations/equations.jl")
 
 export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        AnalysisCallback,
@@ -52,5 +62,6 @@ export e_vibr_iho, c_vibr_iho, generate_e_c_vibr_iho
 export generate_e_vibr_arr_harmonic_cutoff_K, generate_e_vibr_arr_anharmonic_cutoff_K
 export e_vibr_from_array, c_vibr_from_array, generate_e_c_vibr_from_array
 export LinearInterpolation, CvOffset, NoCvOffset
+export CompressibleEulerEquationsMs1T2D, flux_oblapenko_etal
 
 end
