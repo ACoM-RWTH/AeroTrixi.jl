@@ -591,7 +591,6 @@ end
     return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
 end
 
-
 """
     flux_oblapenko_etal_taylor(u_ll, u_rr, orientation_or_normal_direction,
                         equations::CompressibleEulerEquationsMs1T2D)
@@ -646,11 +645,13 @@ The multi-species version is also described in
         if (abs(T_jump) >= equations.min_T_jump)
             inv_T_jump = 1.0 / T_jump
             @inbounds for i in eachcomponent(thermodata)
-                cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr, T_rr,
-                                                                    thermodata)
+                cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr,
+                                                                           T_rr,
+                                                                           thermodata)
                                      -
-                                     entropy_c_v_integral_taylor_component(i, ic_ll, T_ll,
-                                                                    thermodata)) *
+                                     entropy_c_v_integral_taylor_component(i, ic_ll,
+                                                                           T_ll,
+                                                                           thermodata)) *
                                     inv_T_jump
                 e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
                 e_int_rr = energy_component(i, ie_rr, fe_rr, thermodata)
@@ -688,11 +689,13 @@ The multi-species version is also described in
         if (abs(T_jump) >= equations.min_T_jump)
             inv_T_jump = 1.0 / T_jump
             @inbounds for i in eachcomponent(thermodata)
-                cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr, T_rr,
-                                                                    thermodata)
+                cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr,
+                                                                           T_rr,
+                                                                           thermodata)
                                      -
-                                     entropy_c_v_integral_taylor_component(i, ic_ll, T_ll,
-                                                                    thermodata)) *
+                                     entropy_c_v_integral_taylor_component(i, ic_ll,
+                                                                           T_ll,
+                                                                           thermodata)) *
                                     inv_T_jump
                 e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
                 e_int_rr = energy_component(i, ie_rr, fe_rr, thermodata)
@@ -720,7 +723,8 @@ The multi-species version is also described in
     return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
 end
 
-@inline function flux_oblapenko_etal_taylor(u_ll, u_rr, normal_direction::AbstractVector,
+@inline function flux_oblapenko_etal_taylor(u_ll, u_rr,
+                                            normal_direction::AbstractVector,
                                             equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
     # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
@@ -766,10 +770,10 @@ end
         inv_T_jump = 1.0 / T_jump
         @inbounds for i in eachcomponent(thermodata)
             cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr, T_rr,
-                                                                thermodata)
+                                                                       thermodata)
                                  -
                                  entropy_c_v_integral_taylor_component(i, ic_ll, T_ll,
-                                                                thermodata)) *
+                                                                       thermodata)) *
                                 inv_T_jump
 
             e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)

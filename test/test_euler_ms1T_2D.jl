@@ -412,7 +412,7 @@ end
                         f_log = flux_oblapenko_etal(u_ll, u_rr, dir, eq)
                         f_tay = flux_oblapenko_etal_taylor(u_ll, u_rr, dir, eq)
                         for j in (1, 2, 4, 5)
-                            @test f_tay[j] ≈ f_log[j] rtol=1e-16
+                            @test f_tay[j]≈f_log[j] rtol=1e-16
                         end
                     end
                 end
@@ -435,8 +435,9 @@ end
                 @test abs(prim_rr[3] - prim_ll[3]) < eq.min_T_jump
 
                 for dir in taylor_directions
-                    @test flux_oblapenko_etal_taylor(u_ll, u_rr, dir, eq) ≈
-                          flux_oblapenko_etal(u_ll, u_rr, dir, eq) rtol=1e-16
+                    @test flux_oblapenko_etal_taylor(u_ll, u_rr, dir,
+                                                     eq)≈
+                    flux_oblapenko_etal(u_ll, u_rr, dir, eq) rtol=1e-16
                 end
             end
         end
