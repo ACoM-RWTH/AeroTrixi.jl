@@ -8,6 +8,7 @@ using AeroTrixi: ThermoData1T, ncomponents, eachcomponent,
                  energy_component, c_v_component, energy, c_v,
                  energy_from_rho_vec,
                  entropy_c_v_integral_component, entropy_c_v_integral,
+                 entropy_c_v_integral_taylor_component, entropy_c_v_integral_taylor,
                  limit_T_low_rho_inv, temperature_rho_inv,
                  temperature_rho_inv_with_index, get_gamma,
                  ReferenceFlowQuantities, SVector, k_B
@@ -422,6 +423,135 @@ const T_OFF_GRID = (137.3, 462.71, 1234.567, 2999.99, 4321.98)
             @test all(diff(collect(errors)) .< 0.0)
             for k in 1:(length(errors) - 1)
                 @test 3.5 < errors[k] / errors[k + 1] < 4.5
+            end
+        end
+    end
+
+    @testset "Taylor entropy integral is exact on the c_v grid" begin
+        # on a grid point Δ = 0, so the partial-cell term vanishes in both versions
+        # and only the tabulated part is left
+        for offset in (false, true)
+            td = build_lin(offset)
+            for ic in (2, 17, 123, 400)
+                T = td.T_c_arr[ic]
+                for i in eachcomponent(td)
+                    @test entropy_c_v_integral_taylor_component(i, ic, T,
+                                                                td)≈entropy_c_v_integral_component(i,
+                                                                                                   ic,
+                                                                                                   T,
+                                                                                                   td) rtol=1e-13
+                end
+            end
+        end
+    end
+
+    @testset "Taylor entropy integral is close to the log version" begin
+        # dT / T_min = 0.1 here, so Δ <= 0.1 and the neglected Δ^4 / 4 is below 1e-4
+        # of the partial-cell term; the deviation is largest just above T_min, where
+        # the integral itself is close to zero
+        for offset in (false, true)
+            for td in (build(identity_ref_q(), offset), build_lin(offset))
+                rho = 1.7
+                u = state(rho)
+
+                for T in (sample_temperatures(40)..., T_OFF_GRID...)
+                    _, _, index_c, _ = get_index_lower_fracpos(T, td)
+
+                    for i in eachcomponent(td)
+                        @test entropy_c_v_integral_taylor_component(i, index_c, T,
+                                                                    td)≈entropy_c_v_integral_component(i,
+                                                                                                       index_c,
+                                                                                                       T,
+                                                                                                       td) rtol=5e-4
+                    end
+
+                    @test entropy_c_v_integral_taylor(u, T, rho,
+                                                      td)≈entropy_c_v_integral(u, T, rho,
+                                                                               td) rtol=5e-4
+                end
+            end
+        end
+    end
+
+    @testset "Taylor entropy integral is fourth-order accurate in dT" begin
+        # halving dT halves Δ, so the deviation from the logarithm has to drop by
+        # about sixteen. The sample sits at a fixed fraction of the interpolation interval
+        # holding T_ANCHOR rather than at a fixed temperature: Δ is then proportional to dT
+        # for every step, instead of depending on where the sample happens to land
+        # inside its interpolation interval.
+        T_ANCHOR = 200.0
+
+        for offset in (false, true)
+            errors = map((20.0, 10.0, 5.0, 2.5)) do Δ
+                td = build_lin(offset; step = Δ)
+                _, _, ic, _ = get_index_lower_fracpos(T_ANCHOR, td)
+                T = td.T_c_arr[ic] + 0.9 * Δ
+
+                maximum(eachcomponent(td)) do i
+                    abs(entropy_c_v_integral_taylor_component(i, ic, T, td) -
+                        entropy_c_v_integral_component(i, ic, T, td))
+                end
+            end
+
+            @test all(diff(collect(errors)) .< 0.0)
+
+            # convergence of approximately 4th order, i.e. error drops by ~16
+            for k in 1:(length(errors) - 1)
+                @test 14.0 < errors[k] / errors[k + 1] < 19.0
+            end
+        end
+    end
+
+    @testset "Taylor entropy integral: differences over an interpolation interval" begin
+        # the entropy-conservative flux only uses differences of the integral, so
+        # they have to stay close to the ones the logarithm version produces even
+        # when both ends sit inside a single interpolation interval
+        for offset in (false, true)
+            td = build_lin(offset)
+
+            for (T_a, T_b) in ((137.3, 142.9), (1234.567, 1234.999),
+                               (462.71, 4321.98), (2999.99, 3000.01))
+                _, _, ic_a, _ = get_index_lower_fracpos(T_a, td)
+                _, _, ic_b, _ = get_index_lower_fracpos(T_b, td)
+                for i in eachcomponent(td)
+                    reference = entropy_c_v_integral_component(i, ic_b, T_b, td) -
+                                entropy_c_v_integral_component(i, ic_a, T_a, td)
+                    approx = entropy_c_v_integral_taylor_component(i, ic_b, T_b, td) -
+                             entropy_c_v_integral_taylor_component(i, ic_a, T_a, td)
+
+                    @test approx≈reference rtol=1e-3
+                end
+            end
+        end
+    end
+
+    @testset "Taylor entropy integral with reference scaling" begin
+        # Δ is a ratio of temperatures, so scaling the tables must not change how
+        # well the expansion does
+        ref_q = scaled_ref_q()
+
+        for offset in (false, true)
+            td = ThermoData1T(ref_q, copy(MASSES), E_C_FUNS_LIN;
+                              T_min = T_MIN, T_max = T_MAX, dT = dT,
+                              cv_table_offset = offset)
+            rho = 1.7
+            u = state(rho)
+
+            for T in (sample_temperatures(20)..., T_OFF_GRID...)
+                T_scaled = T / ref_q.T_ref
+                _, _, index_c, _ = get_index_lower_fracpos(T_scaled, td)
+
+                for i in eachcomponent(td)
+                    @test entropy_c_v_integral_taylor_component(i, index_c, T_scaled,
+                                                                td)≈entropy_c_v_integral_component(i,
+                                                                                                   index_c,
+                                                                                                   T_scaled,
+                                                                                                   td) rtol=5e-4
+                end
+
+                @test entropy_c_v_integral_taylor(u, T_scaled, rho,
+                                                  td)≈entropy_c_v_integral(u, T_scaled,
+                                                                           rho, td) rtol=5e-4
             end
         end
     end

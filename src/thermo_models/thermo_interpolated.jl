@@ -419,6 +419,48 @@ end
     return mixture_c_v_integral / rho
 end
 
+# same as `entropy_c_v_integral_component`, but the logarithm of the partial
+# contribution is replaced by the first three terms of its Taylor expansion
+# log(T_b / T_a) = log(1 + Δ) = Δ - Δ^2 / 2 + Δ^3 / 3 - ..., Δ = (T_b - T_a) / T_a
+# Δ stays in [0, dT / T_min_c_v), so the truncation error Δ^4 / 4 of the logarithm is
+# fourth order in dT / T; the tabulated part of the integral is untouched and remains
+# whatever `tabulate_int_c_v_over_t` made it
+@inline function entropy_c_v_integral_taylor_component(i_comp, index_lower_c, T_b,
+                                                       thermodata::ThermoData1T{LinearInterpolation,
+                                                                                CvO,
+                                                                                NCOMP}) where {
+                                                                                               CvO,
+                                                                                               NCOMP
+                                                                                               }
+    @inbounds T_a = thermodata.T_c_arr[index_lower_c]
+    @inbounds T_a_inv = thermodata.T_c_arr_inv[index_lower_c]
+
+    @inbounds c_v_a = thermodata.c_v_arr[index_lower_c, i_comp]    # value of c_v at closest_T
+    @inbounds slope = (thermodata.c_v_arr[index_lower_c + 1, i_comp] - c_v_a) *
+                      thermodata.inv_dT
+
+    Δ = T_b * T_a_inv - 1.0    # (T_b - T_a) / T_a
+    log_approx = Δ * (1.0 - Δ * (0.5 - Δ / 3.0))
+    integrate_part = (c_v_a - slope * T_a) * log_approx + slope * (T_b - T_a)
+
+    @inbounds return thermodata.int_c_v_over_t_arr[index_lower_c, i_comp] +
+                     integrate_part
+end
+
+# compute ∫ c_v / T dT of flow, using the Taylor-expanded contribution
+@inline function entropy_c_v_integral_taylor(u, T, rho, thermodata::ThermoData1T)
+    mixture_c_v_integral = 0.0
+
+    _, _, index_lower_c, _ = get_index_lower_fracpos(T, thermodata)
+    @inbounds for i in eachcomponent(thermodata)
+        mixture_c_v_integral += entropy_c_v_integral_taylor_component(i, index_lower_c,
+                                                                      T,
+                                                                      thermodata) *
+                                u[i + 3]
+    end
+    return mixture_c_v_integral / rho
+end
+
 # check if energy is too low, return true if it is
 # u is vector of conservative flow variables,
 # rho_inv is 1/rho, e is the internal energy per unit mass

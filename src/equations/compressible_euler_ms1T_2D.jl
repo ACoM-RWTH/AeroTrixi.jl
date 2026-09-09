@@ -591,6 +591,215 @@ end
     return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
 end
 
+"""
+    flux_oblapenko_etal_taylor(u_ll, u_rr, orientation_or_normal_direction,
+                        equations::CompressibleEulerEquationsMs1T2D)
+
+This flux is a faster approximate version of the multi-species entropy-conservative flux described in
+- Georgii Oblapenko, Manuel Torrilhon (2025)
+  Entropy-conservative high-order methods for high-enthalpy gas flows
+  [DOI: 10.1016/j.compfluid.2025.106640](https://doi.org/10.1016/j.compfluid.2025.106640)
+
+The multi-species version is also described in
+- Georgii Oblapenko, Arseniy Tarnovskiy, Moritz Ertl, Manuel Torrilhon (2026)
+  Entropy-Stable Fluxes for High-Order Discontinuous Galerkin Simulations of High-Enthalpy Flows
+  [DOI: 10.1007/978-3-032-11115-9_36](https://doi.org/10.1007/978-3-032-11115-9_36)
+"""
+@inline function flux_oblapenko_etal_taylor(u_ll, u_rr, orientation::Integer,
+                                            equations::CompressibleEulerEquationsMs1T2D)
+    thermodata = equations.thermodata
+    # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
+    # only for NoCvOffset
+    # the c_v fractional positions are not needed here: the entropy integral only
+    # takes the cell index, and c_v itself is only evaluated at T_mid below
+    (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
+                                                                                      equations)
+    (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
+                                                                                      equations)
+
+    v1_avg = 0.5 * (v1_ll + v1_rr)
+    v2_avg = 0.5 * (v2_ll + v2_rr)
+    inv_T_avg = 0.5 * (1.0 / T_ll + 1.0 / T_rr)
+    T_geo_sqr = T_ll * T_rr
+
+    velocity_square_avg = 0.5 * (v1_ll^2 + v2_ll^2 + v1_rr^2 + v2_rr^2)
+    T_jump = T_rr - T_ll
+
+    tmp_sum = 0.0
+    @inbounds for i in eachcomponent(thermodata)
+        tmp_sum = tmp_sum +
+                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+    end
+
+    if (orientation == 1)
+        @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
+                                                                              abs(rhos_rr[i])) *
+                                                                      v1_avg
+                                                                      for i in eachcomponent(thermodata))
+        fx_rhos_sum = sum(fx_rhos)
+        fx_rho_v1 = v1_avg * fx_rhos_sum + tmp_sum / inv_T_avg
+        fx_rho_v2 = v2_avg * fx_rhos_sum
+        fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
+               0.5 * fx_rhos_sum * velocity_square_avg
+
+        if (abs(T_jump) >= equations.min_T_jump)
+            inv_T_jump = 1.0 / T_jump
+            @inbounds for i in eachcomponent(thermodata)
+                cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr,
+                                                                           T_rr,
+                                                                           thermodata)
+                                     -
+                                     entropy_c_v_integral_taylor_component(i, ic_ll,
+                                                                           T_ll,
+                                                                           thermodata)) *
+                                    inv_T_jump
+                e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
+                e_int_rr = energy_component(i, ie_rr, fe_rr, thermodata)
+                cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
+
+                fx_e = fx_e +
+                       fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
+                        T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
+            end
+        else
+            T_mid = 0.5 * (T_ll + T_rr)
+            inv_T_mid = 1.0 / T_mid
+
+            _, _, ic_mid, fc_mid = get_index_lower_fracpos(T_mid, thermodata)
+            @inbounds for i in eachcomponent(thermodata)
+                cvmid = c_v_component(i, ic_mid, fc_mid, thermodata)
+                fx_e = fx_e +
+                       fx_rhos[i] *
+                       (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
+                         energy_component(i, ie_rr, fe_rr, thermodata))
+                        +
+                        T_geo_sqr * (cvmid * inv_T_mid - inv_T_avg * cvmid))
+            end
+        end
+    else
+        @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
+                                                                              abs(rhos_rr[i])) *
+                                                                      v2_avg
+                                                                      for i in eachcomponent(thermodata))
+        fx_rhos_sum = sum(fx_rhos)
+        fx_rho_v2 = v2_avg * fx_rhos_sum + tmp_sum / inv_T_avg
+        fx_rho_v1 = v1_avg * fx_rhos_sum
+        fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
+               0.5 * fx_rhos_sum * velocity_square_avg
+        if (abs(T_jump) >= equations.min_T_jump)
+            inv_T_jump = 1.0 / T_jump
+            @inbounds for i in eachcomponent(thermodata)
+                cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr,
+                                                                           T_rr,
+                                                                           thermodata)
+                                     -
+                                     entropy_c_v_integral_taylor_component(i, ic_ll,
+                                                                           T_ll,
+                                                                           thermodata)) *
+                                    inv_T_jump
+                e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
+                e_int_rr = energy_component(i, ie_rr, fe_rr, thermodata)
+
+                cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
+
+                fx_e += fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
+                         T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
+            end
+        else
+            T_mid = 0.5 * (T_ll + T_rr)
+            inv_T_mid = 1.0 / T_mid
+            _, _, ic_mid, fc_mid = get_index_lower_fracpos(T_mid, thermodata)
+            @inbounds for i in eachcomponent(thermodata)
+                cvmid = c_v_component(i, ic_mid, fc_mid, thermodata)
+
+                fx_e += fx_rhos[i] *
+                        (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
+                          energy_component(i, ie_rr, fe_rr, thermodata))
+                         +
+                         T_geo_sqr * (cvmid * inv_T_mid - inv_T_avg * cvmid))
+            end
+        end
+    end
+    return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
+end
+
+@inline function flux_oblapenko_etal_taylor(u_ll, u_rr,
+                                            normal_direction::AbstractVector,
+                                            equations::CompressibleEulerEquationsMs1T2D)
+    thermodata = equations.thermodata
+    # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
+    # only for NoCvOffset
+    (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
+                                                                                      equations)
+    (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
+                                                                                      equations)
+
+    v1_avg = 0.5 * (v1_ll + v1_rr)
+    v2_avg = 0.5 * (v2_ll + v2_rr)
+    inv_T_avg = 0.5 * (1.0 / T_ll + 1.0 / T_rr)
+    T_geo_sqr = T_ll * T_rr
+
+    velocity_square_avg = 0.5 * (v1_ll^2 + v2_ll^2 + v1_rr^2 + v2_rr^2)
+    T_jump = T_rr - T_ll
+
+    v_dot_n_ll = v1_ll * normal_direction[1] + v2_ll * normal_direction[2]
+    v_dot_n_rr = v1_rr * normal_direction[1] + v2_rr * normal_direction[2]
+
+    tmp_sum = 0.0
+    @inbounds for i in eachcomponent(thermodata)
+        tmp_sum = tmp_sum +
+                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+    end
+
+    v_dot_n_avg = 0.5 * (v_dot_n_ll + v_dot_n_rr)
+
+    @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
+                                                                          abs(rhos_rr[i])) *
+                                                                  v_dot_n_avg
+                                                                  for i in eachcomponent(thermodata))
+    #use ln_mean function in math.jl
+    fx_rhos_sum = sum(fx_rhos)
+
+    p_avg = tmp_sum / inv_T_avg
+    fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg * normal_direction[1]
+    fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg * normal_direction[2]
+    fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
+           0.5 * fx_rhos_sum * velocity_square_avg
+
+    if (abs(T_jump) >= equations.min_T_jump)
+        inv_T_jump = 1.0 / T_jump
+        @inbounds for i in eachcomponent(thermodata)
+            cv_Tast_over_Tast = (entropy_c_v_integral_taylor_component(i, ic_rr, T_rr,
+                                                                       thermodata)
+                                 -
+                                 entropy_c_v_integral_taylor_component(i, ic_ll, T_ll,
+                                                                       thermodata)) *
+                                inv_T_jump
+
+            e_int_ll = energy_component(i, ie_ll, fe_ll, thermodata)
+            e_int_rr = energy_component(i, ie_rr, fe_rr, thermodata)
+            cv_T_astast = (e_int_rr - e_int_ll) * inv_T_jump
+
+            fx_e = fx_e +
+                   fx_rhos[i] * (0.5 * (e_int_ll + e_int_rr) +
+                    T_geo_sqr * (cv_Tast_over_Tast - inv_T_avg * cv_T_astast))
+        end
+    else
+        T_mid = 0.5 * (T_ll + T_rr)
+        inv_T_mid = 1.0 / T_mid
+        _, _, ic_mid, fc_mid = get_index_lower_fracpos(T_mid, thermodata)
+        @inbounds for i in eachcomponent(thermodata)
+            cvmid = c_v_component(i, ic_mid, fc_mid, thermodata)
+            fx_e = fx_e +
+                   fx_rhos[i] * (0.5 * (energy_component(i, ie_ll, fe_ll, thermodata) +
+                     energy_component(i, ie_rr, fe_rr, thermodata))
+                    +
+                    T_geo_sqr * (cvmid * (inv_T_mid - inv_T_avg)))
+        end
+    end
+    return SVector(fx_rho_v1, fx_rho_v2, fx_e, fx_rhos...)
+end
+
 @inline function flux(u, orientation::Integer,
                       equations::CompressibleEulerEquationsMs1T2D)
     rho_v1, rho_v2, rho_e = u
