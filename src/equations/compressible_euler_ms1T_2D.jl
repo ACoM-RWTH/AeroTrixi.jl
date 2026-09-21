@@ -745,11 +745,12 @@ end
     v_dot_n_ll = v1_ll * normal_direction[1] + v2_ll * normal_direction[2]
     v_dot_n_rr = v1_rr * normal_direction[1] + v2_rr * normal_direction[2]
 
-    tmp_sum = 0.0
+    p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
-        tmp_sum = tmp_sum +
-                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+        p_avg = p_avg +
+                0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
+    p_avg = tmp_sum / inv_T_avg
 
     v_dot_n_avg = 0.5 * (v_dot_n_ll + v_dot_n_rr)
 
@@ -759,8 +760,6 @@ end
                                                                   for i in eachcomponent(thermodata))
     #use ln_mean function in math.jl
     fx_rhos_sum = sum(fx_rhos)
-
-    p_avg = tmp_sum / inv_T_avg
     fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg * normal_direction[1]
     fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg * normal_direction[2]
     fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -

@@ -435,11 +435,11 @@ end
     @inbounds T_a = thermodata.T_c_arr[index_lower_c]
     @inbounds T_a_inv = thermodata.T_c_arr_inv[index_lower_c]
 
-    @inbounds c_v_a = thermodata.c_v_arr[index_lower_c, i_comp]    # value of c_v at closest_T
+    @inbounds c_v_a = thermodata.c_v_arr[index_lower_c, i_comp] # value of c_v at closest_T
     @inbounds slope = (thermodata.c_v_arr[index_lower_c + 1, i_comp] - c_v_a) *
                       thermodata.inv_dT
 
-    Δ = T_b * T_a_inv - 1.0    # (T_b - T_a) / T_a
+    Δ = T_b * T_a_inv - 1.0  # (T_b - T_a) / T_a
     log_approx = Δ * (1.0 - Δ * (0.5 - Δ / 3.0))
     integrate_part = (c_v_a - slope * T_a) * log_approx + slope * (T_b - T_a)
 
