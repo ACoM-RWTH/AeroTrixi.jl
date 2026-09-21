@@ -421,11 +421,12 @@ The multi-species version is also described in
     velocity_square_avg = 0.5 * (v1_ll^2 + v2_ll^2 + v1_rr^2 + v2_rr^2)
     T_jump = T_rr - T_ll
 
-    tmp_sum = 0.0
+    p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
-        tmp_sum = tmp_sum +
+        p_avg = p_avg +
                   0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
+    p_avg = p_avg / inv_T_avg
 
     if (orientation == 1)
         @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
@@ -433,7 +434,7 @@ The multi-species version is also described in
                                                                       v1_avg
                                                                       for i in eachcomponent(thermodata))  #use ln_mean function in math.jl
         fx_rhos_sum = sum(fx_rhos)
-        fx_rho_v1 = v1_avg * fx_rhos_sum + tmp_sum / inv_T_avg
+        fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg
         fx_rho_v2 = v2_avg * fx_rhos_sum
         fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
                0.5 * fx_rhos_sum * velocity_square_avg
@@ -476,7 +477,7 @@ The multi-species version is also described in
                                                                       v2_avg
                                                                       for i in eachcomponent(thermodata))
         fx_rhos_sum = sum(fx_rhos)
-        fx_rho_v2 = v2_avg * fx_rhos_sum + tmp_sum / inv_T_avg
+        fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg
         fx_rho_v1 = v1_avg * fx_rhos_sum
         fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
                0.5 * fx_rhos_sum * velocity_square_avg
@@ -537,11 +538,12 @@ end
     v_dot_n_ll = v1_ll * normal_direction[1] + v2_ll * normal_direction[2]
     v_dot_n_rr = v1_rr * normal_direction[1] + v2_rr * normal_direction[2]
 
-    tmp_sum = 0.0
+    p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
-        tmp_sum = tmp_sum +
+        p_avg = p_avg +
                   0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
+    p_avg = p_avg / inv_T_avg
 
     v_dot_n_avg = 0.5 * (v_dot_n_ll + v_dot_n_rr)
 
@@ -552,7 +554,6 @@ end
     #use ln_mean function in math.jl
     fx_rhos_sum = sum(fx_rhos)
 
-    p_avg = tmp_sum / inv_T_avg
     fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg * normal_direction[1]
     fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg * normal_direction[2]
     fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
@@ -625,11 +626,12 @@ The multi-species version is also described in
     velocity_square_avg = 0.5 * (v1_ll^2 + v2_ll^2 + v1_rr^2 + v2_rr^2)
     T_jump = T_rr - T_ll
 
-    tmp_sum = 0.0
+    p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
-        tmp_sum = tmp_sum +
+        p_avg = p_avg +
                   0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
+    p_avg = p_avg / inv_T_avg
 
     if (orientation == 1)
         @inbounds fx_rhos = SVector{ncomponents(thermodata), Float64}(ln_mean(abs(rhos_ll[i]),
@@ -637,7 +639,7 @@ The multi-species version is also described in
                                                                       v1_avg
                                                                       for i in eachcomponent(thermodata))
         fx_rhos_sum = sum(fx_rhos)
-        fx_rho_v1 = v1_avg * fx_rhos_sum + tmp_sum / inv_T_avg
+        fx_rho_v1 = v1_avg * fx_rhos_sum + p_avg
         fx_rho_v2 = v2_avg * fx_rhos_sum
         fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
                0.5 * fx_rhos_sum * velocity_square_avg
@@ -682,7 +684,7 @@ The multi-species version is also described in
                                                                       v2_avg
                                                                       for i in eachcomponent(thermodata))
         fx_rhos_sum = sum(fx_rhos)
-        fx_rho_v2 = v2_avg * fx_rhos_sum + tmp_sum / inv_T_avg
+        fx_rho_v2 = v2_avg * fx_rhos_sum + p_avg
         fx_rho_v1 = v1_avg * fx_rhos_sum
         fx_e = v1_avg * fx_rho_v1 + v2_avg * fx_rho_v2 -
                0.5 * fx_rhos_sum * velocity_square_avg
@@ -750,7 +752,7 @@ end
         p_avg = p_avg +
                 0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
-    p_avg = tmp_sum / inv_T_avg
+    p_avg = p_avg / inv_T_avg
 
     v_dot_n_avg = 0.5 * (v_dot_n_ll + v_dot_n_rr)
 
