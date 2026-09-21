@@ -33,7 +33,7 @@ Currently, the additional functionality provided by AeroTrixi.jl is
 - the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
 such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
 - the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
-- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows of calorically imperfect gases in thermal equilibrium, which is based on tabulated thermodynamic data stored in `ThermoData1T`; an entropy-conservative flux `flux_oblapenko_etal` is provided, and chemical reactions are possible via source terms (see examples)
+- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows of calorically imperfect gases in thermal equilibrium, which is based on tabulated thermodynamic data stored in `ThermoData1T`; an entropy-conservative flux `flux_oblapenko_etal` is provided, and chemical reactions are possible via source terms (see examples). A faster approximate version of the EC flux is available as `flux_oblapenko_etal_taylor`.
 
 ## Credit
 
