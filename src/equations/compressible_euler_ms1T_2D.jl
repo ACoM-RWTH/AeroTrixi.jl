@@ -424,7 +424,7 @@ The multi-species version is also described in
     p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
         p_avg = p_avg +
-                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+                0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
     p_avg = p_avg / inv_T_avg
 
@@ -541,7 +541,7 @@ end
     p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
         p_avg = p_avg +
-                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+                0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
     p_avg = p_avg / inv_T_avg
 
@@ -629,7 +629,7 @@ The multi-species version is also described in
     p_avg = 0.0
     @inbounds for i in eachcomponent(thermodata)
         p_avg = p_avg +
-                  0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
+                0.5 * ((abs(rhos_ll[i]) + abs(rhos_rr[i])) * thermodata.inv_mass[i])
     end
     p_avg = p_avg / inv_T_avg
 
