@@ -518,8 +518,9 @@ end
 @inline function flux_oblapenko_etal(u_ll, u_rr, normal_direction::AbstractVector,
                                      equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
-    # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
-    # only for NoCvOffset
+    # `ie`/`fe` are indices and partial offset for the energy table
+    # `ic`/`fc` are indices and partial offset for the c_v table
+    # the two coincide when energy and c_v values are stored at the same temperatures
     (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
                                                                                       equations)
     (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
@@ -608,10 +609,9 @@ The multi-species version is also described in
 @inline function flux_oblapenko_etal_taylor(u_ll, u_rr, orientation::Integer,
                                             equations::CompressibleEulerEquationsMs1T2D)
     thermodata = equations.thermodata
-    # `ie`/`fe` index the energy table, `ic`/`fc` the c_v table; the two coincide
-    # only for NoCvOffset
-    # the c_v fractional positions are not needed here: the entropy integral only
-    # takes the cell index, and c_v itself is only evaluated at T_mid below
+    # `ie`/`fe` are indices and partial offset for the energy table
+    # `ic`/`fc` are indices and partial offset for the c_v table
+    # the two coincide when energy and c_v values are stored at the same temperatures
     (ie_ll, fe_ll, ic_ll, _, (v1_ll, v2_ll, T_ll, rhos_ll...)) = cons2prim_with_index(u_ll,
                                                                                       equations)
     (ie_rr, fe_rr, ic_rr, _, (v1_rr, v2_rr, T_rr, rhos_rr...)) = cons2prim_with_index(u_rr,
