@@ -62,6 +62,7 @@ export e_vibr_iho, c_vibr_iho, generate_e_c_vibr_iho
 export generate_e_vibr_arr_harmonic_cutoff_K, generate_e_vibr_arr_anharmonic_cutoff_K
 export e_vibr_from_array, c_vibr_from_array, generate_e_c_vibr_from_array
 export LinearInterpolation, CvOffset, NoCvOffset
-export CompressibleEulerEquationsMs1T2D, flux_oblapenko_etal
+export CompressibleEulerEquationsMs1T2D
+export flux_oblapenko_etal, flux_oblapenko_etal_taylor
 
 end

@@ -27,7 +27,7 @@ Currently, the additional functionality provided by AeroTrixi.jl is
 - the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
 such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
 - the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
-- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows, which is based on tabulated thermodynamic data
+- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows, which is based on tabulated thermodynamic data. Two entropy-conservative fluxes are available: `flux_oblapenko_etal` and `flux_oblapenko_etal_taylor`; the latter uses a third-order Taylor series expansion for one of the logarithms in the entropy function and is approximately more 20% faster than the exact flux, with entropy conservation staying at approximately same level of accuracy for small temperature discretization steps (~1 K).
 
 ## Documentation
 

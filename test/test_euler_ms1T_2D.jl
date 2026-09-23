@@ -9,7 +9,8 @@ using AeroTrixi
 using AeroTrixi: CompressibleEulerEquationsMs1T2D, ReferenceFlowQuantities, k_B,
                  e_rot_cont, c_rot_cont, e_vibr_iho, c_vibr_iho,
                  cons2prim_with_index, get_index_lower_fracpos, get_gamma,
-                 energy_internal, energy_kinetic, flux_oblapenko_etal, SVector
+                 energy_internal, energy_kinetic, flux_oblapenko_etal,
+                 flux_oblapenko_etal_taylor, SVector
 
 using Trixi: entropy, entropy_math, entropy_thermodynamic, cons2entropy, total_entropy
 
@@ -80,6 +81,22 @@ function scaled_cons(T, v1, v2, p, x_mol; ref_q = REF_Q)
                    rho * e_total / (ref_q.rho_ref * ref_q.e_ref),
                    rho * Y_mol / ref_q.rho_ref,
                    rho * Y_atom / ref_q.rho_ref)
+end
+
+# the same gas as `EQUATIONS`, with the table resolution and the c_v grid under
+# the caller's control. `T_min` is kept at 30 K for every step so that the
+# tabulated entropy integral starts from the same reference temperature and the
+# comparisons below are not contaminated by a shifted integration constant
+function build_equations(; dT = 1.0, offset = false, min_T_jump = 1e-5, T_min = 30.0)
+    return CompressibleEulerEquationsMs1T2D(REF_Q, [MASS_MOL, MASS_ATOM],
+                                            [e_int_mol, e_int_atom],
+                                            [c_int_mol, c_int_atom];
+                                            T_min = T_min,
+                                            T_max = T_min +
+                                                    ceil((3.0e4 - T_min) / dT) * dT,
+                                            dT = dT, T_tol = 1e-11,
+                                            min_T_jump = min_T_jump,
+                                            cv_table_offset = offset)
 end
 
 @testset "CompressibleEulerEquationsMs1T2D" begin
@@ -270,6 +287,258 @@ end
                           fstar)
                 rhs = psi(u_ll, orientation) - psi(u_rr, orientation)
                 @test lhs≈rhs atol=1e-9
+            end
+        end
+    end
+
+    # --------------------------------------------------------------------------
+    # `flux_oblapenko_etal_taylor` is `flux_oblapenko_etal` with the logarithm of
+    # the partial-interval entropy integral replaced by three terms of its Taylor
+    # expansion, log(1 + Δ) ≈ Δ - Δ²/2 + Δ³/3 with Δ = (T - T_a) / T_a and T_a the
+    # c_v grid point below T. The truncation is O(Δ⁴), i.e. fourth order in
+    # dT / T, and it reaches the flux through the energy component only.
+    #
+    # Since `cons2entropy` keeps the exact logarithm, the approximation costs the
+    # flux its exact entropy conservation; what is left is a Tadmor residual of
+    # the size of the truncation, verified by the last testset below.
+    # --------------------------------------------------------------------------
+    @testset "flux_oblapenko_etal_taylor" begin
+        # a spread of scenarios: large, moderate, reversed and near-zero
+        # temperature jumps, both ends of the table, extreme compositions and a
+        # state pair at rest
+        taylor_scenarios = (("large T jump",
+                             (2000.0, -600.0, 780.0, 22222.0, 0.35),
+                             (11000.0, -750.0, 858.0, 18000.0, 0.55)),
+                            ("reversed jump",
+                             (11000.0, 900.0, -300.0, 40000.0, 0.8),
+                             (2500.0, -200.0, 500.0, 12000.0, 0.2)),
+                            ("moderate jump",
+                             (4003.5, -600.0, 780.0, 22222.0, 0.35),
+                             (5200.5, -750.0, 858.0, 18000.0, 0.55)),
+                            ("small jump",
+                             (6000.0, 100.0, -50.0, 20000.0, 0.5),
+                             (6000.05, 101.0, -49.0, 20001.0, 0.5)),
+                            ("cold pair",
+                             (60.0, 30.0, -20.0, 200.0, 0.5),
+                             (140.0, 35.0, -25.0, 300.0, 0.45)),
+                            ("hot pair",
+                             (24000.0, 1500.0, -900.0, 90000.0, 0.1),
+                             (28000.0, 1400.0, -800.0, 80000.0, 0.9)),
+                            ("near-pure atom",
+                             (3000.0, 10.0, 20.0, 15000.0, 1e-7),
+                             (7000.0, -30.0, 40.0, 25000.0, 1e-6)),
+                            ("near-pure molecule",
+                             (3000.0, 10.0, 20.0, 15000.0, 1 - 1e-7),
+                             (7000.0, -30.0, 40.0, 25000.0, 1 - 1e-6)),
+                            ("at rest",
+                             (3000.0, 0.0, 0.0, 15000.0, 0.4),
+                             (9000.0, 0.0, 0.0, 25000.0, 0.6)))
+
+        # every scenario is checked in both orientations and along oblique normals
+        taylor_directions = (1, 2, SVector(1.0, 0.0), SVector(0.0, 1.0),
+                             SVector(0.6, -0.8), SVector(-0.35, 0.7) ./ sqrt(0.6125))
+
+        @testset "close to flux_oblapenko_etal" begin
+            # dT / T is at most 1 K / 2000 K for the warm scenarios and 1 K / 60 K
+            # for the cold one, so the O((dT/T)^4) truncation is far below the
+            # accuracy of the tables themselves
+            for offset in (false, true)
+                eq = build_equations(; offset = offset)
+                for (_, a, b) in taylor_scenarios
+                    u_ll, u_rr = scaled_cons(a...), scaled_cons(b...)
+                    for dir in taylor_directions
+                        @test flux_oblapenko_etal_taylor(u_ll, u_rr, dir,
+                                                         eq)≈flux_oblapenko_etal(u_ll,
+                                                                                 u_rr,
+                                                                                 dir,
+                                                                                 eq) rtol=1e-8
+                    end
+                end
+            end
+        end
+
+        @testset "small temperature jumps magnify the truncation" begin
+            # the energy component carries [I(T_rr) - I(T_ll)] / (T_rr - T_ll) with
+            # I the entropy integral, so an absolute truncation of c_v Δ⁴/4 in I
+            # reaches the flux divided by the temperature jump. The deviation from
+            # `flux_oblapenko_etal` therefore grows like 1 / (T_rr - T_ll) as the
+            # jump shrinks towards `min_T_jump`, below which both fluxes switch to
+            # the midpoint branch and agree exactly again.
+            #
+            # Several base temperatures are used because a pair that happens to sit
+            # inside one c_v interpolation interval has its truncation cancel in the difference.
+            function worst_deviation(eq, jumps)
+                worst = 0.0
+                for T0 in (6000.0, 6000.37, 12345.6), jump in jumps
+                    u_ll = scaled_cons(T0, 100.0, -50.0, 20000.0, 0.5)
+                    u_rr = scaled_cons(T0 + jump, 101.0, -49.0, 20001.0, 0.5)
+                    for dir in (1, 2, SVector(0.6, -0.8))
+                        f_log = flux_oblapenko_etal(u_ll, u_rr, dir, eq)
+                        f_tay = flux_oblapenko_etal_taylor(u_ll, u_rr, dir, eq)
+                        worst = max(worst,
+                                    maximum(abs.(f_tay .- f_log) ./
+                                            max.(abs.(f_log), 1e-300)))
+                    end
+                end
+                return worst
+            end
+
+            for offset in (false, true)
+                eq = build_equations(; offset = offset)
+
+                wide = worst_deviation(eq, (2000.0, 100.0))
+                narrow = worst_deviation(eq, (0.1, 0.01, 0.001, 1e-4))
+
+                # every one of these still takes the divided-difference branch
+                @test 1e-4 / REF_Q.T_ref > eq.min_T_jump
+
+                # amplified, but the flux is still good to six digits at a jump of
+                # 1e-4 K, four orders of magnitude below the coarsest jump tried
+                @test narrow < 1e-6
+                @test wide < 1e-12
+                @test narrow > 1e3 * wide
+            end
+        end
+
+        @testset "only the energy component differs" begin
+            # the mass and momentum components never touch the entropy integral,
+            # so they have to come out identical however coarse the
+            # table is
+            for offset in (false, true)
+                eq = build_equations(; dT = 50.0, offset = offset)
+                for (_, a, b) in taylor_scenarios
+                    u_ll, u_rr = scaled_cons(a...), scaled_cons(b...)
+                    for dir in taylor_directions
+                        f_log = flux_oblapenko_etal(u_ll, u_rr, dir, eq)
+                        f_tay = flux_oblapenko_etal_taylor(u_ll, u_rr, dir, eq)
+                        for j in (1, 2, 4, 5)
+                            @test f_tay[j]≈f_log[j] rtol=1e-16
+                        end
+                    end
+                end
+            end
+        end
+
+        @testset "identical below min_T_jump" begin
+            # under the threshold both fluxes take the midpoint branch, which
+            # contains no logarithm and is shared verbatim
+            for offset in (false, true)
+                eq = build_equations(; offset = offset, min_T_jump = 1e-2)
+
+                # same temperature, different velocities and densities
+                u_ll = scaled_cons(6000.0, 100.0, -50.0, 20000.0, 0.5)
+                u_rr = scaled_cons(6000.0, 120.0, -40.0, 20050.0, 0.5)
+
+                _, _, _, _, prim_ll = cons2prim_with_index(u_ll, eq)
+                _, _, _, _, prim_rr = cons2prim_with_index(u_rr, eq)
+                # the branch under test is only reached if this holds
+                @test abs(prim_rr[3] - prim_ll[3]) < eq.min_T_jump
+
+                for dir in taylor_directions
+                    @test flux_oblapenko_etal_taylor(u_ll, u_rr, dir,
+                                                     eq)≈
+                    flux_oblapenko_etal(u_ll, u_rr, dir, eq) rtol=1e-16
+                end
+            end
+        end
+
+        @testset "consistency, symmetry and rotational invariance" begin
+            flux_rotated = FluxRotated(flux_oblapenko_etal_taylor)
+
+            for offset in (false, true)
+                eq = build_equations(; offset = offset)
+
+                for (_, a, b) in taylor_scenarios
+                    u_ll, u_rr = scaled_cons(a...), scaled_cons(b...)
+
+                    # equal states give the physical flux.
+                    for orientation in (1, 2)
+                        @test flux_oblapenko_etal_taylor(u_ll, u_ll, orientation,
+                                                         eq)≈flux(u_ll, orientation,
+                                                                  eq) rtol=1e-11
+                    end
+
+                    # a two-point flux has to be symmetric in its two states.
+                    # not exactly zero due to order of evaluation of certain functions
+                    for dir in taylor_directions
+                        @test flux_oblapenko_etal_taylor(u_ll, u_rr, dir,
+                                                         eq)≈flux_oblapenko_etal_taylor(u_rr,
+                                                                                        u_ll,
+                                                                                        dir,
+                                                                                        eq) rtol=1e-13
+                    end
+
+                    # an orientation and the matching axis-aligned normal agree
+                    @test flux_oblapenko_etal_taylor(u_ll, u_rr, 1,
+                                                     eq)≈flux_oblapenko_etal_taylor(u_ll,
+                                                                                    u_rr,
+                                                                                    SVector(1.0,
+                                                                                            0.0),
+                                                                                    eq) rtol=1e-13
+                    @test flux_oblapenko_etal_taylor(u_ll, u_rr, 2,
+                                                     eq)≈flux_oblapenko_etal_taylor(u_ll,
+                                                                                    u_rr,
+                                                                                    SVector(0.0,
+                                                                                            1.0),
+                                                                                    eq) rtol=1e-13
+
+                    for dir in directions()
+                        n = SVector{2}(dir ./ sqrt(dir[1]^2 + dir[2]^2))
+                        @test flux_oblapenko_etal_taylor(u_ll, u_rr, n,
+                                                         eq)≈flux_rotated(u_ll, u_rr, n,
+                                                                          eq) rtol=1e-13
+                    end
+                end
+            end
+        end
+
+        # ----------------------------------------------------------------------
+        # Entropy behaviour, measured on state pairs alone to avoid running
+        # a full solver setup.
+        # The Tadmor condition (w_ll - w_rr) . f* = psi_ll - psi_rr is what makes
+        # the flux entropy conservative; `flux_oblapenko_etal` satisfies it to
+        # round-off, `flux_oblapenko_etal_taylor` to the truncation error.
+        # ----------------------------------------------------------------------
+        @testset "entropy conservation" begin
+            function psi_t(u, orientation, eq)
+                rho = density(u, eq)
+                v = orientation == 1 ? u[1] / rho : u[2] / rho
+                return sum(cons2entropy(u, eq) .* flux(u, orientation, eq)) -
+                       v * entropy(u, eq)
+            end
+
+            # residual of the Tadmor condition for one state pair
+            function tadmor_residual(f, u_ll, u_rr, orientation, eq)
+                fstar = f(u_ll, u_rr, orientation, eq)
+                lhs = sum((cons2entropy(u_ll, eq) .- cons2entropy(u_rr, eq)) .* fstar)
+                rhs = psi_t(u_ll, orientation, eq) - psi_t(u_rr, orientation, eq)
+                return abs(lhs - rhs)
+            end
+
+            function worst_residual(f, scenarios, eq)
+                worst = 0.0
+                for (_, a, b) in scenarios
+                    u_ll, u_rr = scaled_cons(a...), scaled_cons(b...)
+                    for orientation in (1, 2)
+                        worst = max(worst, tadmor_residual(f, u_ll, u_rr, orientation, eq))
+                    end
+                end
+                return worst
+            end
+
+            @testset "Tadmor condition on the production table" begin
+                # the entropy-flux potentials jump by O(1) across these pairs, so a
+                # residual of 1e-8 is a relative error below 1e-9
+                for offset in (false, true)
+                    eq = build_equations(; offset = offset)
+                    for (_, a, b) in taylor_scenarios
+                        u_ll, u_rr = scaled_cons(a...), scaled_cons(b...)
+                        for orientation in (1, 2)
+                            @test tadmor_residual(flux_oblapenko_etal_taylor, u_ll, u_rr,
+                                                  orientation, eq) < 1e-8
+                        end
+                    end
+                end
             end
         end
     end
