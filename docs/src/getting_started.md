@@ -109,3 +109,22 @@ Try, for instance, the following four combinations and compare the density at t 
 
 The default setting, `polydeg = 2` and `mesh_size = 0.1`, is chosen to run fast
 while still giving a reasonable result.
+
+## Example result
+
+For comparison with your own runs, this is the density at t = 0.6 on a finer mesh
+with a higher polynomial degree, which takes about ten minutes on four threads:
+```julia
+trixi_include("elixir_euler_NACA6412airfoil_supersonic.jl", polydeg = 3, mesh_size = 0.035)
+```
+
+![Density at t = 0.6 for polydeg = 3 and mesh_size = 0.035](https://github.com/user-attachments/assets/a11e338d-02c5-4735-bb92-2cc4bd0c1032)
+
+The bow shock in front of the airfoil, its reflections at the top and bottom walls,
+and the expansion at the trailing edge are clearly visible.
+
+For simplicity, this example keeps the setup fixed: the mesh does not adapt to the
+shocks during the simulation, and all cells use the same polynomial degree. The cells
+are only made smaller towards the airfoil, as prescribed in the `.geo` file.
+Resolving the shocks more efficiently, for instance with adaptive mesh refinement,
+is beyond this first example.
