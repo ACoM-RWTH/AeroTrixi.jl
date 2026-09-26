@@ -71,8 +71,8 @@ of the Trixi.jl documentation.
 The script is divided into six parts, which you find as sections in the file:
 
 1. **Equations and initial condition**: the compressible Euler equations with
-   ``\gamma = 1.4``. The whole domain is initially filled with the freestream state
-   ``\rho = 1.4``, ``v_1 = 2``, ``v_2 = 0``, ``p = 1``, which has a speed of sound of 1,
+   γ = 1.4. The whole domain is initially filled with the freestream state
+   ρ = 1.4, v₁ = 2, v₂ = 0, p = 1, which has a speed of sound of 1,
    i.e. the flow has Mach number 2.
 2. **Boundary conditions**: at the supersonic inflow (left) the flux is computed from
    the freestream state, at the supersonic outflow (right) from the state inside the
@@ -84,7 +84,7 @@ The script is divided into six parts, which you find as sections in the file:
    (DGSEM) with polynomials of degree `polydeg` in each cell. Near shocks the method
    is blended with a robust finite volume method, which is controlled by a shock indicator.
 5. **Time integration**: a strong stability preserving Runge-Kutta method up to
-   ``t = 0.6``, with the time step chosen by the CFL condition and a limiter that
+   t = 0.6, with the time step chosen by the CFL condition and a limiter that
    keeps density and pressure positive.
 6. **Visualization**: a plot of the density and the mesh.
 
@@ -98,7 +98,7 @@ using Trixi
 trixi_include("elixir_euler_NACA6412airfoil_supersonic.jl", polydeg = 1, mesh_size = 0.05)
 ```
 
-Try, for instance, the following four combinations and compare the density at ``t = 0.6``:
+Try, for instance, the following four combinations and compare the density at t = 0.6:
 
 | `polydeg` | `mesh_size` | what to expect |
 |:---------:|:-----------:|:---------------|
