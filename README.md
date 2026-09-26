@@ -27,7 +27,10 @@ Pkg.add("AeroTrixi")
 
 ## Quick Start
 
-To get started, it is best to take a look at the examples.
+New to Trixi.jl? The [Getting started](https://acom-rwth.github.io/AeroTrixi.jl/stable/getting_started/) tutorial walks through a complete simulation of a supersonic flow around an airfoil,
+from the Gmsh geometry file to a plot of the result (`examples/p4est_2d_dgsem/elixir_euler_NACA6412airfoil_supersonic.jl`).
+
+Beyond that, it is best to take a look at the examples.
 Currently, the additional functionality provided by AeroTrixi.jl is
 
 - the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,

@@ -16,6 +16,7 @@ makedocs(modules = [AeroTrixi],
                                   canonical = "https://acom-rwth.github.io/AeroTrixi.jl/stable"),
          pages = [
              "Home" => "index.md",
+             "Getting started" => "getting_started.md",
              "API Reference" => "api.md"
          ],
          doctest = true,
