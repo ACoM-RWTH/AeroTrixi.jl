@@ -21,7 +21,7 @@ Pkg.add("AeroTrixi")
 
 ## Quick Start
 
-New to Trixi.jl? The [Getting started](getting_started.md) tutorial walks through a complete simulation of a supersonic flow around an airfoil,
+New to AeroTrixi.jl? The [Getting started](getting_started.md) tutorial walks through a complete simulation of a supersonic flow around an airfoil,
 from the Gmsh geometry file to a plot of the result.
 
 Beyond that, it is best to take a look at the examples.
