@@ -2,5 +2,5 @@
 
 ```@autodocs
 Modules = [AeroTrixi]
-Order = [:type, :function]
+Order = [:type, :macro, :function]
 ```

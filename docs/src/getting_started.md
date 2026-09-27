@@ -58,8 +58,26 @@ include("elixir_euler_NACA6412airfoil_supersonic.jl")
 ```
 Every 100 time steps a short summary of the solution is printed. There is no exact
 solution for this flow, so no errors are computed.
-At the end, the density together with the mesh is plotted and saved as `out/density.png`.
+At the end, the density together with the mesh is plotted.
 Other quantities can be plotted in the REPL with, e.g., `plot(pd["v1"])` or `plot(pd["p"])`.
+
+### Where the results are stored
+
+Each run is stored in its own directory, named after the example file and the
+parameters of the run, here
+`out/elixir_euler_NACA6412airfoil_supersonic/polydeg=2__mesh_size=0.1/`.
+This is set up by the line with `@RunInfo` in the example. The directory contains
+- `density.png`, the plot of the density,
+- `run.toml`, a text file describing the run: the parameters, the versions of Julia,
+  Trixi.jl and AeroTrixi.jl, whether the run finished, the final time, the number of
+  time steps and cells, and the run time,
+- `setup.txt`, a summary of the equations, the mesh, and the solver,
+- copies of the example file and of the `.geo` file, exactly as they were used,
+- the final solution (`restart_*.h5`) and the mesh (`mesh_*.h5`), which can be
+  loaded again with `load_run` for further evaluation.
+
+Running the example again with the same parameters replaces the results of the
+previous run; runs with other parameters are stored next to it.
 
 The solution can also be written to files for [ParaView](https://www.paraview.org/)
 or [VisIt](https://visit-dav.github.io/visit-website/); see the
@@ -108,7 +126,8 @@ Try, for instance, the following four combinations and compare the density at t 
 | 3 | 0.05 | a finer mesh together with a higher polynomial degree takes the longest time to compute, but gives the sharpest result |
 
 The default setting, `polydeg = 2` and `mesh_size = 0.1`, is chosen to run fast
-while still giving a reasonable result.
+while still giving a reasonable result. Each combination is stored in its own
+directory, so the results of all four can be compared afterwards.
 
 ## Example result
 
@@ -128,3 +147,14 @@ shocks during the simulation, and all cells use the same polynomial degree. The 
 are only made smaller towards the airfoil, as prescribed in the `.geo` file.
 Resolving the shocks more efficiently, for instance with adaptive mesh refinement,
 is beyond this first example.
+
+## Next step: adaptive mesh refinement
+
+`elixir_euler_NACA6412airfoil_supersonic_amr.jl` in the same folder computes the
+same flow either with adaptive mesh refinement (AMR), which refines the coarse mesh
+from the `.geo` file automatically at the shocks, or on static meshes of different
+sizes. The setup is chosen by commenting lines in or out at the top of the file.
+After running several setups,
+`elixir_euler_NACA6412airfoil_supersonic_compare.jl` collects the stored runs and
+plots the density and the pressure along a line in front of the airfoil for all of
+them.

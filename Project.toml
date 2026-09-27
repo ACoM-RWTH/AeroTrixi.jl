@@ -4,16 +4,20 @@ version = "0.4.1"
 authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko"]
 
 [deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FlowRef = "e2f09e9e-4b11-4a24-9e3f-a1cd38a03ba0"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Trixi = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
 
 [compat]
+Dates = "1"
 FlowRef = "0.2.0"
 LinearAlgebra = "1"
 MuladdMacro = "0.2.4"
 StaticArrays = "1.9.8"
+TOML = "1"
 Trixi = "0.17.2"
 julia = "1.10"

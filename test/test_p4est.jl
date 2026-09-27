@@ -51,6 +51,34 @@ isdir(outdir) && rm(outdir, recursive = true)
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
         @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+
+        # Each run is stored in its own directory, from which the final solution of
+        # the last run (mesh_size = 0.1) is restored exactly
+        @eval using AeroTrixi: find_runs, load_run
+        runs_directory = joinpath("out", "elixir_euler_NACA6412airfoil_supersonic")
+        @test length(find_runs(runs_directory)) == 3
+        stored_run = load_run(only(find_runs(runs_directory; mesh_size = 0.1)))
+        @test stored_run.time ≈ 0.3
+        @test stored_run.u_ode == sol.u[end]
+    end
+
+    @trixi_testset "elixir_euler_NACA6412airfoil_supersonic_amr.jl" begin
+        # short runs of both setups, which are compared in the next test
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_euler_NACA6412airfoil_supersonic_amr.jl"),
+                            tspan=(0.0, 0.05))
+        @test Trixi.nelements(semi.solver, semi.cache) > 442 # the mesh was refined
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_euler_NACA6412airfoil_supersonic_amr.jl"),
+                            use_amr=false, tspan=(0.0, 0.05))
+        @test Trixi.nelements(semi.solver, semi.cache) == 442
+    end
+
+    @trixi_testset "elixir_euler_NACA6412airfoil_supersonic_compare.jl" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_euler_NACA6412airfoil_supersonic_compare.jl"))
+        @test length(runs) == 2
+        @test isfile(joinpath(runs_directory, "comparison.png"))
     end
 
     @trixi_testset "elixir_euler_NACA0012airfoil_mach08.jl" begin

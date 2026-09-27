@@ -1,4 +1,5 @@
 using Trixi
+using AeroTrixi: @RunInfo
 using OrdinaryDiffEqSSPRK
 using Gmsh: gmsh
 using Plots
@@ -15,6 +16,7 @@ using Plots
 #   6. a plot of the result
 #
 # Try changing `polydeg` and `mesh_size` below and compare the results.
+# The results of each run are stored in their own directory, see `@RunInfo` below.
 
 ###############################################################################
 # 1. equations and initial condition
@@ -132,7 +134,14 @@ analysis_callback = AnalysisCallback(semi, interval = 100, analysis_errors = Sym
 # choose the time step from the CFL condition
 stepsize_callback = StepsizeCallback(cfl = 0.5)
 
-callbacks = CallbackSet(summary_callback, analysis_callback, stepsize_callback)
+# Store the results of this run in `out/<name of this file>/<parameters>/`, e.g.,
+# `out/elixir_euler_NACA6412airfoil_supersonic/polydeg=2__mesh_size=0.1/`, together with
+# a description of the run (`run.toml`), a copy of this file and of the .geo file,
+# and the final solution. Running the same parameters again replaces these results.
+run_info = @RunInfo(semi; parameters = (; polydeg, mesh_size), files = [geo_file])
+
+callbacks = CallbackSet(summary_callback, analysis_callback, stepsize_callback,
+                        run_info.callback)
 
 # The strong shocks can make the density or pressure negative for a moment,
 # which the positivity limiter prevents
@@ -151,4 +160,4 @@ sol = solve(ode, SSPRK33(stage_limiter! = stage_limiter!);
 pd = PlotData2D(sol)
 plot(pd["rho"], size = (1300, 550))
 plot!(getmesh(pd))
-savefig(joinpath("out", "density.png"))
+savefig(joinpath(run_info.dir, "density.png"))

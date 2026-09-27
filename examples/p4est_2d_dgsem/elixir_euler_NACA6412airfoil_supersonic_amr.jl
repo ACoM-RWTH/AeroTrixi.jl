@@ -1,17 +1,24 @@
 using Trixi
+using AeroTrixi: @RunInfo
 using OrdinaryDiffEqSSPRK
 using Gmsh: gmsh
 using Plots
 
 ###############################################################################
-# Supersonic flow (Mach 2) around a NACA 6412 airfoil with adaptive mesh refinement (AMR).
+# Supersonic flow (Mach 2) around a NACA 6412 airfoil, with adaptive mesh refinement
+# (AMR) or on a static mesh.
 #
-# This is `elixir_euler_NACA6412airfoil_supersonic.jl` with one addition: the mesh
-# from the .geo file is only a coarse skeleton, which is refined automatically
-# where shocks are and coarsened again where they have passed. The additions are
-# marked with "AMR" below.
+# This is `elixir_euler_NACA6412airfoil_supersonic.jl` with one addition: with AMR,
+# the mesh from the .geo file is only a coarse skeleton, which is refined
+# automatically where shocks are and coarsened again where they have passed. The
+# additions are marked with "AMR" below.
 #
-# This example walks through the complete workflow of a simulation:
+# Choose a setup in section 0, run this file, and repeat for other setups. Each run
+# is stored in its own directory `out/<name of this file>/<parameters>/`. Afterwards,
+# `elixir_euler_NACA6412airfoil_supersonic_compare.jl` compares all stored runs.
+#
+# The file walks through the complete workflow of a simulation:
+#   0. the choice of the setup
 #   1. the equations and the initial condition
 #   2. the boundary conditions
 #   3. the mesh, generated from a Gmsh geometry file
@@ -19,8 +26,24 @@ using Plots
 #   5. the adaptive mesh refinement (AMR)
 #   6. the time integration with a few callbacks
 #   7. a plot of the result
-#
-# Try changing `max_level` below and compare the results.
+
+###############################################################################
+# 0. setup: comment in exactly one of the following lines
+
+#! format: off
+# AMR with 3 refinement levels on the coarse mesh (about 1 minute on 4 threads)
+use_amr = true; mesh_size = 0.2; max_level = 3
+# AMR with 4 refinement levels (about 3 minutes)
+# use_amr = true; mesh_size = 0.2; max_level = 4
+# static mesh with about as many cells as AMR with 3 levels at the end (about 30 s)
+# use_amr = false; mesh_size = 0.065
+# static mesh with about the same run time as AMR with 3 levels
+# use_amr = false; mesh_size = 0.042
+# static mesh with somewhat less run time than AMR with 4 levels
+# use_amr = false; mesh_size = 0.034
+#! format: on
+
+polydeg = 2 # polynomial degree of the solution in each cell
 
 ###############################################################################
 # 1. equations and initial condition
@@ -67,9 +90,6 @@ end
 
 ###############################################################################
 # 3. mesh
-
-polydeg = 2      # polynomial degree of the solution in each cell
-mesh_size = 0.2  # relative size of the cells of the coarse initial mesh
 
 # Gmsh reads the geometry file and generates a mesh of quadrilaterals,
 # which is written in the Abaqus (.inp) format that Trixi.jl can read
@@ -120,25 +140,25 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_conditions)
 
 ###############################################################################
-# 5. AMR: adaptive mesh refinement
+# 5. AMR: adaptive mesh refinement (only if `use_amr = true`)
 
-# The indicator measures how strongly the density varies within each cell;
-# it is large at shocks
-amr_indicator = IndicatorLoehner(semi, variable = Trixi.density)
+if use_amr
+    # The indicator measures how strongly the density varies within each cell;
+    # it is large at shocks
+    amr_indicator = IndicatorLoehner(semi, variable = Trixi.density)
 
-# Cells with an indicator above `med_threshold` are refined to `med_level`,
-# cells above `max_threshold` to `max_level`, and all others are coarsened back
-# to `base_level`, i.e., the initial mesh. Each level halves the cell size, so
-# with `max_level = 3` the cells at the shocks are 8 times smaller than initially.
-# Try `max_level = 4`, which sharpens the shocks further but about doubles the run time.
-max_level = 3
-amr_controller = ControllerThreeLevel(semi, amr_indicator,
-                                      base_level = 0,
-                                      med_level = 2, med_threshold = 0.02,
-                                      max_level = max_level, max_threshold = 0.05)
+    # Cells with an indicator above `med_threshold` are refined to `med_level`,
+    # cells above `max_threshold` to `max_level`, and all others are coarsened back
+    # to `base_level`, i.e., the initial mesh. Each level halves the cell size, so
+    # with `max_level = 3` the cells at the shocks are 8 times smaller than initially.
+    amr_controller = ControllerThreeLevel(semi, amr_indicator,
+                                          base_level = 0,
+                                          med_level = 2, med_threshold = 0.02,
+                                          max_level = max_level, max_threshold = 0.05)
 
-# adapt the mesh every 10 time steps
-amr_callback = AMRCallback(semi, amr_controller, interval = 10)
+    # adapt the mesh every 10 time steps
+    amr_callback = AMRCallback(semi, amr_controller, interval = 10)
+end
 
 ###############################################################################
 # 6. time integration
@@ -159,10 +179,25 @@ analysis_callback = AnalysisCallback(semi, interval = 100, analysis_errors = Sym
 # choose the time step from the CFL condition
 stepsize_callback = StepsizeCallback(cfl = 0.5)
 
+# Store the results of this run in `out/<name of this file>/<parameters>/` together
+# with a description of the run (`run.toml`), a copy of this file and of the .geo file,
+# and the final solution. Running the same setup again replaces these results.
+if use_amr
+    parameters = (; use_amr, polydeg, mesh_size, max_level)
+else
+    parameters = (; use_amr, polydeg, mesh_size)
+end
+run_info = @RunInfo(semi; parameters, files = [geo_file])
+
 # the AMR callback has to come before the `stepsize_callback`, so that the
 # time step is computed on the adapted mesh
-callbacks = CallbackSet(summary_callback, analysis_callback, amr_callback,
-                        stepsize_callback)
+if use_amr
+    callbacks = CallbackSet(summary_callback, analysis_callback, amr_callback,
+                            stepsize_callback, run_info.callback)
+else
+    callbacks = CallbackSet(summary_callback, analysis_callback, stepsize_callback,
+                            run_info.callback)
+end
 
 # The strong shocks can make the density or pressure negative for a moment,
 # which the positivity limiter prevents
@@ -181,4 +216,4 @@ sol = solve(ode, SSPRK33(stage_limiter! = stage_limiter!);
 pd = PlotData2D(sol)
 plot(pd["rho"], size = (1300, 550))
 plot!(getmesh(pd))
-savefig(joinpath("out", "density_amr.png"))
+savefig(joinpath(run_info.dir, "density.png"))
