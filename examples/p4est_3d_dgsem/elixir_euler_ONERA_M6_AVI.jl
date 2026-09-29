@@ -150,12 +150,15 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                                            u_inf(equations)))
 
 analysis_interval = 10_000
-analysis_callback = AeroTrixi.AnalysisCallback(semi, interval = analysis_interval,
-                                               analysis_errors = Symbol[],
-                                               analysis_integrals = (lift_coefficient,),
-                                               analysis_pointwise = (pressure_coefficient,),
-                                               save_analysis = true,
-                                               output_directory = "out/")
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = (lift_coefficient,),
+                                     save_analysis = true,
+                                     output_directory = "out/")
+
+# save the pressure coefficient at all surface nodes of the wing
+surface_pointwise_callback = SurfacePointwiseCallback(semi, pressure_coefficient;
+                                                      interval = analysis_interval)
 
 ###############################################################################
 
@@ -189,6 +192,7 @@ stepsize_callback = StepsizeCallback(cfl = cfl, interval = 2)
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
+                        surface_pointwise_callback,
                         save_solution,
                         save_restart,
                         stepsize_callback)
