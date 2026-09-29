@@ -53,9 +53,9 @@ function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
 
     # Store element indices of nodes for convenient postprocessing
     # In 2D, the boundaries are lines => multiply with number of nodes
-    element_indices = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    element_indices = Vector{Int}(undef, n_boundary_elements * n_nodes)
     # Store unqiue node counter to distinguish nodes at the same spatial position
-    node_counter = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    node_counter = Vector{Int}(undef, n_boundary_elements * n_nodes)
     # Physical coordinates of boundary indices
     coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes, dim)
     # Variable values at boundary indices
@@ -126,9 +126,9 @@ function analyze(surface_variable::AnalysisSurfacePointwise{Variable},
 
     # Store element indices of nodes for convenient postprocessing
     # In 2D, the boundaries are lines => multiply with number of nodes
-    element_indices = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    element_indices = Vector{Int}(undef, n_boundary_elements * n_nodes)
     # Store unqiue node counter to distinguish nodes at the same spatial position
-    node_counter = Vector{Int}(undef, n_boundary_elements * n_nodes^2)
+    node_counter = Vector{Int}(undef, n_boundary_elements * n_nodes)
     # Physical coordinates of boundary indices
     coordinates = Matrix{real(dg)}(undef, n_boundary_elements * n_nodes, dim)
     # Variable values at boundary indices

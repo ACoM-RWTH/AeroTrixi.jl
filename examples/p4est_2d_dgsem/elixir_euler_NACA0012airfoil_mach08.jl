@@ -95,19 +95,23 @@ pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
                                                                            u_inf()))
 
 analysis_interval = 500_000 # Only at the end
-analysis_callback = AeroTrixi.AnalysisCallback(semi, interval = analysis_interval,
-                                               output_directory = "out",
-                                               analysis_errors = Symbol[],
-                                               save_analysis = true,
-                                               analysis_integrals = (drag_coefficient,
-                                                                     lift_coefficient),
-                                               analysis_pointwise = (pressure_coefficient,))
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     output_directory = "out",
+                                     analysis_errors = Symbol[],
+                                     save_analysis = true,
+                                     analysis_integrals = (drag_coefficient,
+                                                           lift_coefficient))
+
+# save the pressure coefficient at all surface nodes of the airfoil
+surface_pointwise_callback = SurfacePointwiseCallback(semi, pressure_coefficient;
+                                                      interval = analysis_interval)
 
 ###############################################################################
 
 callbacks = CallbackSet(summary_callback,
                         alive_callback,
                         analysis_callback,
+                        surface_pointwise_callback,
                         save_solution,
                         save_restart)
 
