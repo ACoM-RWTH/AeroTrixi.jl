@@ -162,18 +162,3 @@ function analyze(quantity::AnalysisSurfacePointwise{Variable},
     analyze(quantity, du, u, t, mesh, equations, equations_parabolic, solver, cache, semi,
             cache_parabolic, iter)
 end
-
-"""
-    AeroTrixi.AnalysisCallback(args...; kwargs...)
-
-Removed in AeroTrixi.jl v0.5. Use the `AnalysisCallback` of Trixi.jl for errors and
-integrals, and a [`SurfacePointwiseCallback`](@ref) for the pointwise surface quantities
-that were passed as `analysis_pointwise` before.
-"""
-function AnalysisCallback(args...; kwargs...)
-    throw(ArgumentError("`AeroTrixi.AnalysisCallback` was removed in AeroTrixi.jl v0.5. " *
-                        "Use the `AnalysisCallback` of Trixi.jl for errors and " *
-                        "integrals, and `SurfacePointwiseCallback(semi, quantities...; " *
-                        "interval)` for the pointwise surface quantities passed as " *
-                        "`analysis_pointwise` before."))
-end
