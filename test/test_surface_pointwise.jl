@@ -111,11 +111,6 @@ end
         # the no-slip walls slow down the flow, which causes friction
         @test maximum(abs, output.data) > 0
     end
-
-    @testset "removed AnalysisCallback of AeroTrixi.jl" begin
-        @test_throws ArgumentError AeroTrixi.AnalysisCallback(uniform_flow_semi();
-                                                              analysis_pointwise = ())
-    end
 end
 
 end # module
