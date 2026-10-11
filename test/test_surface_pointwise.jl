@@ -65,9 +65,9 @@ end
     @testset "pressure coefficient" begin
         dir = mktempdir()
         semi = uniform_flow_semi()
-        cp = AnalysisSurfacePointwise((:y_neg,),
-                                      SurfacePressureCoefficient(P_INF, RHO_INF, V_INF),
-                                      dir)
+        cp = SurfacePointwise((:y_neg,),
+                              SurfacePressureCoefficient(P_INF, RHO_INF, V_INF),
+                              dir)
         callback = SurfacePointwiseCallback(semi, cp; interval = 4)
         @test occursin("SurfacePointwiseCallback", sprint(show, callback))
         @test occursin("SurfacePointwiseCallback",
@@ -95,11 +95,11 @@ end
     @testset "friction and pressure coefficient of viscous flow" begin
         dir = mktempdir()
         semi = uniform_flow_semi(viscous = true)
-        cf = AnalysisSurfacePointwise((:y_neg, :y_pos),
-                                      SurfaceFrictionCoefficient(RHO_INF, V_INF), dir)
-        cp = AnalysisSurfacePointwise((:y_neg,),
-                                      SurfacePressureCoefficient(P_INF, RHO_INF, V_INF),
-                                      dir)
+        cf = SurfacePointwise((:y_neg, :y_pos),
+                              SurfaceFrictionCoefficient(RHO_INF, V_INF), dir)
+        cp = SurfacePointwise((:y_neg,),
+                              SurfacePressureCoefficient(P_INF, RHO_INF, V_INF),
+                              dir)
         sol = run_with(semi, SurfacePointwiseCallback(semi, cf, cp; interval = 100))
         final = lpad(sol.stats.naccept, 6, '0')
         @test sort(readdir(dir)) == ["CF_x_000000.h5", "CF_x_$final.h5",

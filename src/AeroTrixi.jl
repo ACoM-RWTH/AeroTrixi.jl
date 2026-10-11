@@ -48,7 +48,7 @@ include("callbacks_step/callbacks_step.jl")
 include("thermo_models/thermo_models.jl")
 include("equations/equations.jl")
 
-export AnalysisSurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
+export SurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        SurfacePointwiseCallback,
        examples_dir
 

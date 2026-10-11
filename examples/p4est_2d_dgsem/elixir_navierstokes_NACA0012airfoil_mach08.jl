@@ -147,14 +147,14 @@ lift_coefficient_shear_force = AnalysisSurfaceIntegral(force_boundary_names,
 ###############################################################################
 # AeroTrixi addition
 
-friction_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfaceFrictionCoefficient(rho_inf(),
-                                                                           u_inf(equations)))
+friction_coefficient = SurfacePointwise(force_boundary_names,
+                                        SurfaceFrictionCoefficient(rho_inf(),
+                                                                   u_inf(equations)))
 
-pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfacePressureCoefficient(p_inf(),
-                                                                           rho_inf(),
-                                                                           u_inf(equations)))
+pressure_coefficient = SurfacePointwise(force_boundary_names,
+                                        SurfacePressureCoefficient(p_inf(),
+                                                                   rho_inf(),
+                                                                   u_inf(equations)))
 
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",

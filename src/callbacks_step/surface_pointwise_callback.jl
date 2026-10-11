@@ -4,12 +4,12 @@ include("analysis_surface_integral.jl")
 include("analysis_surface_pointwise.jl")
 
 """
-    SurfacePointwiseCallback(semi, quantities::AnalysisSurfacePointwise...; interval)
+    SurfacePointwiseCallback(semi, quantities::SurfacePointwise...; interval)
 
 Compute and save pointwise surface quantities, such as the
 [`SurfacePressureCoefficient`](@ref) or the [`SurfaceFrictionCoefficient`](@ref),
 at the start of the simulation, every `interval` time steps, and at the end.
-Each quantity is given as an [`AnalysisSurfacePointwise`](@ref), which determines the
+Each quantity is given as an [`SurfacePointwise`](@ref), which determines the
 boundaries and the output directory; the values at all surface nodes are written to
 `<output directory>/<variable name>_<time step>.h5`, e.g., `out/CP_x_000100.h5`.
 
@@ -23,7 +23,7 @@ This callback replaces the keyword argument `analysis_pointwise` of the
 
 # Example
 ```julia
-pressure_coefficient = AnalysisSurfacePointwise((:airfoil,),
+pressure_coefficient = SurfacePointwise((:airfoil,),
                                                 SurfacePressureCoefficient(p_inf, rho_inf,
                                                                            u_inf))
 surface_pointwise_callback = SurfacePointwiseCallback(semi, pressure_coefficient;
@@ -43,7 +43,7 @@ struct SurfacePointwiseCallback{Quantities}
     end
 end
 
-function SurfacePointwiseCallback(semi, quantities::AnalysisSurfacePointwise...;
+function SurfacePointwiseCallback(semi, quantities::SurfacePointwise...;
                                   interval)
     surface_pointwise = SurfacePointwiseCallback{typeof(quantities)}(interval, quantities)
 
@@ -80,8 +80,8 @@ function (surface_pointwise::SurfacePointwiseCallback)(integrator)
         mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
         u = wrap_array(u_ode, mesh, equations, solver, cache)
         du = wrap_array(du_ode, mesh, equations, solver, cache)
-        analyze_pointwise(surface_pointwise.quantities, du, u, integrator.t, semi,
-                          integrator.stats.naccept)
+        save_surface_pointwise(surface_pointwise.quantities, du, u, integrator.t, semi,
+                               integrator.stats.naccept)
     end
 
     # avoid re-evaluating possible FSAL stages
@@ -114,30 +114,30 @@ function Base.show(io::IO, ::MIME"text/plain",
     end
 end
 
-# Iterate over tuples of pointwise analysis quantities in a type-stable way using "lispy tuple programming".
-function analyze_pointwise(analysis_quantities::NTuple{N, Any}, du, u, t,
-                           semi, iter) where {N}
+# Iterate over tuples of surface quantities in a type-stable way using "lispy tuple programming".
+function save_surface_pointwise(quantities::NTuple{N, Any}, du, u, t,
+                                semi, iter) where {N}
 
-    # Extract the first pointwise analysis quantity and process it; keep the remaining to be processed later
-    quantity = first(analysis_quantities)
-    remaining_quantities = Base.tail(analysis_quantities)
+    # Extract the first surface quantity and process it; keep the remaining to be processed later
+    quantity = first(quantities)
+    remaining_quantities = Base.tail(quantities)
 
     analyze(quantity, du, u, t, semi, iter)
 
-    # Recursively call this method with the unprocessed pointwise analysis quantities
-    analyze_pointwise(remaining_quantities, du, u, t, semi, iter)
+    # Recursively call this method with the unprocessed surface quantities
+    save_surface_pointwise(remaining_quantities, du, u, t, semi, iter)
     return nothing
 end
 
 # terminate the type-stable iteration over tuples
-function analyze_pointwise(analysis_quantities::Tuple{}, du, u, t, semi, iter)
+function save_surface_pointwise(quantities::Tuple{}, du, u, t, semi, iter)
     nothing
 end
 
-# This version of `analyze` is used for `AnalysisSurfacePointwise` such as `SurfacePressureCoefficient`.
+# This version of `analyze` is used for `SurfacePointwise` such as `SurfacePressureCoefficient`.
 # We need the iteration number `iter` to be passed in here
-# as for `AnalysisSurfacePointwise` the writing to disk is handled by the callback itself.
-function analyze(quantity::AnalysisSurfacePointwise{Variable},
+# as for `SurfacePointwise` the writing to disk is handled by the callback itself.
+function analyze(quantity::SurfacePointwise{Variable},
                  du, u, t,
                  semi::AbstractSemidiscretization,
                  iter) where {Variable}
@@ -147,11 +147,11 @@ function analyze(quantity::AnalysisSurfacePointwise{Variable},
 end
 
 # Special analyze for `SemidiscretizationHyperbolicParabolic` such that
-# precomputed gradients are available. Required for `AnalysisSurfacePointwise` equipped
+# precomputed gradients are available. Required for `SurfacePointwise` equipped
 # with `VariableViscous` such as `SurfaceFrictionCoefficient`.
 # As for the inviscid version, we need to pass in the iteration number `iter` as
-# for `AnalysisSurfacePointwise` the writing to disk is handled by the callback itself.
-function analyze(quantity::AnalysisSurfacePointwise{Variable},
+# for `SurfacePointwise` the writing to disk is handled by the callback itself.
+function analyze(quantity::SurfacePointwise{Variable},
                  du, u, t,
                  semi::SemidiscretizationHyperbolicParabolic,
                  iter) where {Variable <: VariableViscous}

@@ -89,10 +89,10 @@ lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
 ###############################################################################
 # AeroTrixi addition
 
-pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfacePressureCoefficient(p_inf(),
-                                                                           rho_inf(),
-                                                                           u_inf()))
+pressure_coefficient = SurfacePointwise(force_boundary_names,
+                                        SurfacePressureCoefficient(p_inf(),
+                                                                   rho_inf(),
+                                                                   u_inf()))
 
 analysis_interval = 500_000 # Only at the end
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
