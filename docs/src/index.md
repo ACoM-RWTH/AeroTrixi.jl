@@ -1,7 +1,7 @@
 # AeroTrixi.jl
 
 **AeroTrixi.jl** is a package for high-fidelity aerodynamic simulations built on top of [Trixi.jl](https://github.com/trixi-framework/Trixi.jl).
-Currently, it extends Trixi.jl's capabilities with a specialized analysis callback for aerodynamic applications.
+Currently, it extends Trixi.jl's capabilities with a callback for pointwise surface quantities in aerodynamic applications.
 In the future, we plan to add more features for nonideal and rarefied gases, for instance.
 
 ## Features
@@ -24,7 +24,7 @@ Pkg.add("AeroTrixi")
 To get started, it is best to take a look at the examples.
 Currently, the additional functionality provided by AeroTrixi.jl is
 
-- the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
+- the `SurfacePointwiseCallback` which can be used to compute and save pointwise aerodynamic coefficients along boundaries,
 such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
 - the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
 - the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows, which is based on tabulated thermodynamic data. Two entropy-conservative fluxes are available: `flux_oblapenko_etal` and `flux_oblapenko_etal_taylor`; the latter uses a third-order Taylor series expansion for one of the logarithms in the entropy function and is approximately more 20% faster than the exact flux, with entropy conservation staying at approximately same level of accuracy for small temperature discretization steps (~1 K).

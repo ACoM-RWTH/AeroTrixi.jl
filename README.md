@@ -7,7 +7,7 @@
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 **AeroTrixi.jl** is a package for high-fidelity aerodynamic simulations built on top of [Trixi.jl](https://github.com/trixi-framework/Trixi.jl).
-Currently, it extends Trixi.jl's capabilities with a specialized analysis callback for aerodynamic applications.
+Currently, it extends Trixi.jl's capabilities with a callback for pointwise surface quantities in aerodynamic applications.
 In the future, we plan to add more features for nonideal and rarefied gases, for instance.
 
 ## Features
@@ -30,7 +30,7 @@ Pkg.add("AeroTrixi")
 To get started, it is best to take a look at the examples.
 Currently, the additional functionality provided by AeroTrixi.jl is
 
-- the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
+- the `SurfacePointwiseCallback` which can be used to compute and save pointwise aerodynamic coefficients along boundaries,
 such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
 - the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
 - the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows of calorically imperfect gases in thermal equilibrium, which is based on tabulated thermodynamic data stored in `ThermoData1T`; an entropy-conservative flux `flux_oblapenko_etal` is provided, and chemical reactions are possible via source terms (see examples). A faster approximate version of the EC flux is available as `flux_oblapenko_etal_taylor`.

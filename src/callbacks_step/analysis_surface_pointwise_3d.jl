@@ -10,7 +10,7 @@
 # the pressure coefficient `SurfacePressureCoefficient`.
 # The boundary/boundaries along which this quantity is to be integrated is determined by
 # `boundary_symbols`, which is retrieved from `surface_variable`.
-function analyze(surface_variable::AnalysisSurfacePointwise, du, u, t,
+function analyze(surface_variable::SurfacePointwise, du, u, t,
                  mesh::P4estMesh{3},
                  equations, dg::DGSEM, cache, semi, iter)
     @unpack boundaries = cache
