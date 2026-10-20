@@ -23,7 +23,9 @@ using Trixi: @printf, @sprintf,
              index_to_start_step_2d, index_to_start_step_3d,
              h5open,
              convert_derivative_to_primitive,
-             viscous_stress_tensor # 2D version in main Trixi.jl
+             viscous_stress_tensor, # 2D version in main Trixi.jl
+             new_p4est, p4est_topidx_t, p4est_connectivity_new_copy,
+             p4est_connectivity_complete, p4est_connectivity_is_valid
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
@@ -47,6 +49,7 @@ include("auxiliary.jl")
 include("callbacks_step/callbacks_step.jl")
 include("thermo_models/thermo_models.jl")
 include("equations/equations.jl")
+include("meshes/p4est_mesh_from_vertices.jl")
 
 export SurfacePointwise, SurfacePressureCoefficient, SurfaceFrictionCoefficient,
        SurfacePointwiseCallback,
@@ -59,5 +62,6 @@ export e_vibr_from_array, c_vibr_from_array, generate_e_c_vibr_from_array
 export LinearInterpolation, CvOffset, NoCvOffset
 export CompressibleEulerEquationsMs1T2D
 export flux_oblapenko_etal, flux_oblapenko_etal_taylor
+export p4est_mesh_from_vertices, p4est_mesh_five_trees
 
 end
