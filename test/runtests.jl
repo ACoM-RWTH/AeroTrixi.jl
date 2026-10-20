@@ -12,6 +12,7 @@ using AeroTrixi
     include(joinpath(@__DIR__, "test_tree.jl"))
     include(joinpath(@__DIR__, "test_p4est.jl"))
     include(joinpath(@__DIR__, "test_p4est_mesh_from_vertices.jl"))
+    include(joinpath(@__DIR__, "test_lnodes_q2.jl"))
 end
 
 @testset "Aqua" begin
