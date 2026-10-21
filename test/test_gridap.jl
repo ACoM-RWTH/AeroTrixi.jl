@@ -154,8 +154,12 @@ end
 
     @testset "transfer DG ↔ Q2 (pattern $pattern)" for pattern in (:C, :F)
         mesh = five_tree_mesh(pattern)
-        semi = SemidiscretizationHyperbolic(mesh, LinearScalarAdvectionEquation2D(0.0, 0.0),
-                                            (x, t, equations) -> SVector(u_quadratic(x)),
+        equations = CompressibleEulerEquations2D(1.4)
+        # Density is the global quadratic (shifted to be positive), velocity zero
+        initial_condition = (x, t, equations) -> prim2cons(SVector(10 + u_quadratic(x),
+                                                                   0.0, 0.0, 1.0),
+                                                           equations)
+        semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition,
                                             DGSEM(polydeg = 2);
                                             boundary_conditions = boundary_condition_do_nothing)
         u_ode = Trixi.compute_coefficients(0.0, semi)
@@ -166,85 +170,101 @@ end
         n_nodes = lnodes.n_independent + lnodes.n_hanging
         model = gridap_model(lnodes)
         dΩ = Measure(Triangulation(model), 6)
-
-        # DG → Q2: averaging reproduces a continuous field at all nodes
-        dg_values = dg_nodal_values((u, equations) -> u[1], u_ode, semi)
-        @test size(dg_values) == (3, 3, n_elements)
-        node_values = dg_to_q2!(zeros(n_nodes), dg_values, lnodes)
-        @test maximum(abs(node_values[k] - u_quadratic(lnodes.coordinates[:, k]))
-                      for k in 1:n_nodes) < 1e-12
         q = gridap_q2_space(lnodes, model; dirichlet_tags = BOX_SIDES)
-        uh = gridap_q2_function(node_values, q)
+
+        # DG → Q2 with two fields: a continuous field is reproduced at all nodes, the
+        # element number is averaged at the independent nodes
+        element_ids = zeros(Int, 3, 3, n_elements)
+        for e in 1:n_elements, j in 1:3, i in 1:3
+            element_ids[i, j, e] = e
+        end
+        element_of_node = Dict(Tuple(round.(x_dg(i, j, e); digits = 12)) => e
+                               for e in 1:n_elements, j in 1:3, i in 1:3)
+        node_values = zeros(2, n_nodes)
+        transfer_dg_to_q2!(node_values, u_ode, semi, lnodes) do u, x, equations
+            # The position identifies the element only up to shared nodes, which is
+            # irrelevant for the first field
+            return SVector(u[1] - 10, x[1])
+        end
+        @test maximum(abs(node_values[1, k] - u_quadratic(lnodes.coordinates[:, k]))
+                      for k in 1:n_nodes) < 1e-12
+        @test maximum(abs(node_values[2, k] - lnodes.coordinates[1, k])
+                      for k in 1:n_nodes) < 1e-12
+        uh = gridap_q2_function(node_values, q; field = 1)
         @test sqrt(sum(∫((uh - u_quadratic) * (uh - u_quadratic)) * dΩ)) < 1e-12
 
-        # DG → Q2: each independent node gets the mean of the adjacent element values,
-        # and each hanging node the value on its coarse face
-        element_ids = [Float64(e) for i in 1:3, j in 1:3, e in 1:n_elements]
-        mean_ids = dg_to_q2!(zeros(n_nodes), element_ids, lnodes)
+        # DG → Q2 with a discontinuous field: averages at independent nodes, coarse-face
+        # values at hanging nodes, i.e., a continuous field
+        semi_ids = SemidiscretizationHyperbolic(mesh,
+                                                LinearScalarAdvectionEquation2D(0.0,
+                                                                                0.0),
+                                                (x, t, equations) -> SVector(0.0),
+                                                DGSEM(polydeg = 2);
+                                                boundary_conditions = boundary_condition_do_nothing)
+        u_ids = Trixi.compute_coefficients(0.0, semi_ids)
+        Trixi.wrap_array(u_ids, semi_ids)[1, :, :, :] .= element_ids
+        mean_ids = zeros(1, n_nodes)
+        transfer_dg_to_q2!((u, x, equations) -> SVector(u[1]), mean_ids, u_ids, semi_ids,
+                           lnodes)
         adjacent = [Int[] for _ in 1:n_nodes]
         for e in 1:n_elements, node in lnodes.element_nodes[:, e]
             push!(adjacent[node], e)
         end
-        @test all(mean_ids[k] ≈ sum(adjacent[k]) / length(adjacent[k])
+        @test all(mean_ids[1, k] ≈ sum(adjacent[k]) / length(adjacent[k])
                   for k in 1:(lnodes.n_independent))
-        @test all(mean_ids[lnodes.n_independent + k] ≈
+        @test all(mean_ids[1, lnodes.n_independent + k] ≈
                   sum(lnodes.hanging_coefficients[:, k] .*
-                      mean_ids[lnodes.hanging_masters[:, k]])
+                      mean_ids[1, lnodes.hanging_masters[:, k]])
                   for k in 1:(lnodes.n_hanging))
-
-        # The transferred field is continuous: it lies in the constrained space, i.e., it
-        # equals its interpolant there
         source = gridap_q2_function(mean_ids, q)
         source_constrained = interpolate_everywhere(source, q.space)
         @test sqrt(sum(∫((source - source_constrained) * (source - source_constrained)) *
                        dΩ)) < 1e-10
 
-        # Q2 → DG: injection of the exact Q2 solution and its gradient
+        # Q2 → DG: the exact Q2 solution written into an Euler state
         φh, _, _, qφ = solve_poisson(lnodes, u_quadratic, f_quadratic)
         φ_nodes = gridap_node_values(φh, qφ)
         @test maximum(abs(φ_nodes[k] - u_quadratic(lnodes.coordinates[:, k]))
                       for k in 1:n_nodes) < 1e-12
-        φ = q2_to_dg!(zeros(3, 3, n_elements), φ_nodes, lnodes)
-        @test maximum(abs(φ[i, j, e] - u_quadratic(x_dg(i, j, e)))
-                      for e in 1:n_elements, j in 1:3, i in 1:3) < 1e-12
-        ∇φ = q2_gradient_to_dg!(zeros(2, 3, 3, n_elements), φ_nodes, lnodes, semi)
         gradient(x) = SVector(2 + x[1] + 1.5 * x[2], -3 + 1.5 * x[1] - 2 * x[2])
-        @test maximum(maximum(abs, ∇φ[:, i, j, e] - gradient(x_dg(i, j, e)))
-                      for e in 1:n_elements, j in 1:3, i in 1:3) < 1e-10
-
-        # Q2 → DG directly into a solution vector: velocity = ∇φ, pressure = φ
-        equations = CompressibleEulerEquations2D(1.4)
-        semi_euler = SemidiscretizationHyperbolic(mesh, equations,
-                                                  initial_condition_constant,
-                                                  DGSEM(polydeg = 2);
-                                                  boundary_conditions = boundary_condition_do_nothing)
-        u_euler = Trixi.compute_coefficients(0.0, semi_euler)
-        density = copy(Trixi.wrap_array(u_euler, semi_euler)[1, :, :, :])
-        q2_to_dg!(u_euler, semi_euler, φ_nodes, lnodes) do u, φ, ∇φ, equations
-            return prim2cons(SVector(u[1], ∇φ[1], ∇φ[2], φ), equations)
+        density = copy(Trixi.wrap_array(u_ode, semi)[1, :, :, :])
+        transfer_q2_to_dg!(u_ode, semi, lnodes, φ_nodes) do u, q, x, equations
+            return prim2cons(SVector(u[1], q2_gradient(q)..., q2_value(q)), equations)
         end
-        u = Trixi.wrap_array(u_euler, semi_euler)
+        u = Trixi.wrap_array(u_ode, semi)
         @test u[1, :, :, :] == density
         @test maximum(maximum(abs,
-                              cons2prim(Trixi.get_node_vars(u, equations,
-                                                            semi_euler.solver, i, j, e),
-                                        equations) -
+                              cons2prim(Trixi.get_node_vars(u, equations, semi.solver,
+                                                            i, j, e), equations) -
                               SVector(density[i, j, e], gradient(x_dg(i, j, e))...,
                                       u_quadratic(x_dg(i, j, e))))
                       for e in 1:n_elements, j in 1:3, i in 1:3) < 1e-10
 
+        # Q2 → DG with two fields and the node position
+        two_fields = vcat(φ_nodes', 2 * φ_nodes')
+        transfer_q2_to_dg!(u_ode, semi, lnodes, two_fields) do u, q, x, equations
+            return SVector(q2_value(q, 1), q2_value(q, 2), q2_gradient(q, 2)[1], x[2])
+        end
+        # Read the nodes with `get_node_vars`; slicing the wrapped array with `u[:, i, j, e]`
+        # inside a comprehension does not return independent copies
+        u = Trixi.wrap_array(u_ode, semi)
+        @test maximum(maximum(abs,
+                              Trixi.get_node_vars(u, equations, semi.solver, i, j, e) -
+                              SVector(u_quadratic(x_dg(i, j, e)),
+                                      2 * u_quadratic(x_dg(i, j, e)),
+                                      2 * gradient(x_dg(i, j, e))[1], x_dg(i, j, e)[2]))
+                      for e in 1:n_elements, j in 1:3, i in 1:3) < 1e-10
+
         # The node-to-node transfer requires polydeg = 2
-        @test_throws AssertionError q2_to_dg!(zeros(4, 4, n_elements), φ_nodes, lnodes)
-        semi3 = SemidiscretizationHyperbolic(mesh,
-                                             LinearScalarAdvectionEquation2D(0.0, 0.0),
-                                             (x, t, equations) -> SVector(0.0),
+        semi3 = SemidiscretizationHyperbolic(mesh, equations, initial_condition,
                                              DGSEM(polydeg = 3);
                                              boundary_conditions = boundary_condition_do_nothing)
-        @test_throws AssertionError dg_to_q2!(zeros(n_nodes),
-                                              dg_nodal_values((u, equations) -> u[1],
-                                                              Trixi.compute_coefficients(0.0,
-                                                                                         semi3),
-                                                              semi3), lnodes)
+        u3 = Trixi.compute_coefficients(0.0, semi3)
+        @test_throws AssertionError transfer_dg_to_q2!((u, x, equations) -> SVector(u[1]),
+                                                       zeros(1, n_nodes), u3, semi3,
+                                                       lnodes)
+        @test_throws AssertionError transfer_q2_to_dg!((u, q, x, equations) -> u, u3,
+                                                       semi3, lnodes, φ_nodes)
     end
 
     @testset "Poisson problem with a source from a Trixi.jl simulation" begin
@@ -259,12 +279,13 @@ end
                                             DGSEM(polydeg = 2);
                                             boundary_conditions = boundary_condition_do_nothing)
         u_ode = Trixi.compute_coefficients(0.0, semi)
-        density_deviation = dg_nodal_values((u, equations) -> u[1] - 1, u_ode, semi)
         lnodes = P4estLnodesQ2(mesh)
         model = gridap_model(lnodes)
         q = gridap_q2_space(lnodes, model; dirichlet_tags = BOX_SIDES)
-        source = gridap_q2_function(dg_to_q2!(zeros(length(q.node_to_dof)),
-                                              density_deviation, lnodes), q)
+        source_nodes = zeros(1, length(q.node_to_dof))
+        transfer_dg_to_q2!((u, x, equations) -> SVector(u[1] - 1), source_nodes, u_ode,
+                           semi, lnodes)
+        source = gridap_q2_function(source_nodes, q)
         U = TrialFESpace(q.space, 0.0)
         dΩ = Measure(Triangulation(model), 4)
         φh = Gridap.solve(AffineFEOperator((u, v) -> ∫(∇(v) ⋅ ∇(u)) * dΩ,

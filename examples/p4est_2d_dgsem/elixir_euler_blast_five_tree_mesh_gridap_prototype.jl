@@ -54,10 +54,13 @@ U = TrialFESpace(V, 0.0)
 ###############################################################################
 # DG → Gridap: density deviation as source term
 
-# Density deviation at the DG nodes, averaged at the Q2 nodes shared by several elements
-density_deviation = dg_nodal_values((u, equations) -> u[1] - 1, sol.u[end], semi)
-source_nodes = dg_to_q2!(zeros(length(q2.node_to_dof)), density_deviation, lnodes)
-source = gridap_q2_function(source_nodes, q2)
+# Density deviation, computed at each DG node and averaged at the Q2 nodes shared by several
+# elements. The function returns one value per field; here a single field.
+source_nodes = zeros(1, length(q2.node_to_dof))
+transfer_dg_to_q2!(source_nodes, sol.u[end], semi, lnodes) do u, x, equations
+    return SVector(u[1] - 1)
+end
+source = gridap_q2_function(source_nodes, q2; field = 1)
 
 ###############################################################################
 # Poisson problem -Δφ = ρ - 1, φ = 0 on the boundary
@@ -83,10 +86,13 @@ println("Poisson problem: ", lnodes, ", ", num_free_dofs(V), " free degrees of f
 # Values of φ at all Q2 nodes, including the hanging nodes
 φ_nodes = gridap_node_values(φh, q2)
 
-# At each DG node, φ is injected and ∇φ is the local derivative. For demonstration, the
-# final blast wave solution is overwritten: the density is kept, the velocity is set to
-# ∇φ, and the pressure to φ.
-q2_to_dg!(sol.u[end], semi, φ_nodes, lnodes) do u, φ, ∇φ, equations
+# At each DG node, the function gets the current state and the Q2 data of φ: its value
+# (injection) and, on request, its local gradient. For demonstration, the final blast wave
+# solution is overwritten: the density is kept, the velocity is set to ∇φ, and the pressure
+# to φ.
+transfer_q2_to_dg!(sol.u[end], semi, lnodes, φ_nodes) do u, q, x, equations
+    φ = q2_value(q)
+    ∇φ = q2_gradient(q)
     return prim2cons(SVector(u[1], ∇φ[1], ∇φ[2], φ), equations)
 end
 
