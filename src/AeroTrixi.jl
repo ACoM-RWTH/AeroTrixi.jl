@@ -68,6 +68,6 @@ export LinearInterpolation, CvOffset, NoCvOffset
 export CompressibleEulerEquationsMs1T2D
 export flux_oblapenko_etal, flux_oblapenko_etal_taylor
 export p4est_mesh_from_vertices, p4est_mesh_five_trees
-export P4estLnodesQ2, apply_hanging_constraints!
+export P4estLnodesQ2, apply_hanging_constraints!, gridap_model, gridap_q2_space
 
 end

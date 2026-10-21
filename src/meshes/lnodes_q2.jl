@@ -192,11 +192,13 @@ end
 function lnodes_q2_coordinates(mesh, element_nodes, n_nodes)
     n_elements = size(element_nodes, 2)
     element_coordinates = Array{Float64}(undef, 2, 3, 3, n_elements)
-    calc_node_coordinates!(element_coordinates, mesh, [-1.0, 0.0, 1.0])
+    # Static nodes avoid allocations in `calc_node_coordinates!`
+    calc_node_coordinates!(element_coordinates, mesh, SVector(-1.0, 0.0, 1.0))
     coordinates = Matrix{Float64}(undef, 2, n_nodes)
     for element in 1:n_elements, j in 1:3, i in 1:3
         node = element_nodes[i + 3 * (j - 1), element]
-        coordinates[:, node] .= view(element_coordinates, :, i, j, element)
+        coordinates[1, node] = element_coordinates[1, i, j, element]
+        coordinates[2, node] = element_coordinates[2, i, j, element]
     end
     return coordinates
 end
@@ -235,27 +237,65 @@ function lnodes_boundary_faces(mesh)
     return boundary_faces
 end
 
-# Collect the boundary names of each node and number the distinct sets of names
+# Collect the boundary names of each node and number the distinct sets of names.
+# The names of a node are stored as a bit mask over the sorted list of all boundary names.
 function lnodes_boundary_entities(boundary_faces, element_nodes, n_nodes)
-    node_names = [Symbol[] for _ in 1:n_nodes]
+    names = sort(unique(name for (_, _, name) in boundary_faces))
+    @assert length(names)<=64 "at most 64 different boundary names are supported"
+    node_mask = zeros(UInt64, n_nodes)
     for (element, face, name) in boundary_faces
+        bit = one(UInt64) << (searchsortedfirst(names, name) - 1)
         for slot in Q2_FACE_SLOTS[face]
-            names = node_names[element_nodes[slot + 1, element]]
-            name in names || push!(names, name)
+            node = element_nodes[slot + 1, element]
+            node_mask[node] |= bit
         end
     end
 
     boundary_entities = Vector{Symbol}[]
-    entity_ids = Dict{Vector{Symbol}, Int}()
+    entity_ids = Dict{UInt64, Int}()
     node_entity = zeros(Int, n_nodes)
     for node in 1:n_nodes
-        isempty(node_names[node]) && continue
-        names = sort(node_names[node])
-        node_entity[node] = get!(entity_ids, names) do
-            push!(boundary_entities, names)
+        mask = node_mask[node]
+        iszero(mask) && continue
+        node_entity[node] = get!(entity_ids, mask) do
+            push!(boundary_entities,
+                  [names[i]
+                   for i in eachindex(names)
+                   if !iszero(mask & (one(UInt64) << (i - 1)))])
             return length(boundary_entities)
         end
     end
     return boundary_entities, node_entity
 end
+
+"""
+    gridap_model(lnodes::P4estLnodesQ2)
+
+Create a Gridap.jl `UnstructuredDiscreteModel` of the quadrilaterals of `lnodes`. The face
+labeling contains the tags `"interior"`, `"boundary"`, and one tag for each boundary name of
+the mesh. Faces and vertices are labeled with the boundary entities of `lnodes`, so that a
+vertex at the junction of two boundaries belongs to both tags. Faces at hanging nodes are
+interior faces.
+
+This function requires Gridap.jl to be loaded (`using Gridap`).
+"""
+function gridap_model end
+
+"""
+    gridap_q2_space(lnodes::P4estLnodesQ2, model; dirichlet_tags = Symbol[])
+
+Create a continuous Q2 finite element space on the Gridap.jl `model` created by
+[`gridap_model`](@ref), using the node numbering of `lnodes`. Nodes carrying one of the
+boundary names in `dirichlet_tags` are Dirichlet nodes. Hanging nodes are constrained with
+`FESpaceWithLinearConstraints`.
+
+Return a named tuple with
+- `space`: the constrained space (the unconstrained one if there are no hanging nodes),
+- `unconstrained`: the space with all nodes as degrees of freedom,
+- `node_to_dof`: degree of freedom of each node in `unconstrained`, positive for free and
+  negative for Dirichlet degrees of freedom.
+
+This function requires Gridap.jl to be loaded (`using Gridap`).
+"""
+function gridap_q2_space end
 end # @muladd
