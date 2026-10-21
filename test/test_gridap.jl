@@ -151,6 +151,84 @@ end
             @test e_h1 < 1e-10
         end
     end
+
+    @testset "transfer DG ↔ Q2 (polydeg = $polydeg, pattern $pattern)" for polydeg in (2,
+                                                                                       3),
+                                                                           pattern in (:C,
+                                                                                       :F)
+
+        mesh = five_tree_mesh(pattern)
+        semi = SemidiscretizationHyperbolic(mesh, LinearScalarAdvectionEquation2D(0.0, 0.0),
+                                            (x, t, equations) -> SVector(u_quadratic(x)),
+                                            DGSEM(polydeg = polydeg);
+                                            boundary_conditions = boundary_condition_do_nothing)
+        u_ode = Trixi.compute_coefficients(0.0, semi)
+        node_coordinates = semi.cache.elements.node_coordinates
+        dg_nodes = semi.solver.basis.nodes
+        n = polydeg + 1
+        n_elements = Trixi.ncells(mesh)
+        x_dg(i, j, element) = node_coordinates[:, i, j, element]
+
+        # DG → Gridap: the discontinuous Q2 function reproduces the global quadratic
+        dg_values = dg_nodal_values((u, equations) -> u[1], u_ode, semi)
+        @test size(dg_values) == (n, n, n_elements)
+        @test all(dg_values[i, j, e] ≈ u_quadratic(x_dg(i, j, e))
+                  for e in 1:n_elements, j in 1:n, i in 1:n)
+        element_values = dg_to_q2_elements(dg_values, dg_nodes)
+        lnodes = P4estLnodesQ2(mesh)
+        model = gridap_model(lnodes)
+        dΩ = Measure(Triangulation(model), 6)
+        uh_dg = gridap_dg_function(gridap_dg_q2_space(model), element_values)
+        @test sqrt(sum(∫((uh_dg - u_quadratic) * (uh_dg - u_quadratic)) * dΩ)) < 1e-12
+
+        # Gridap → DG: values and gradients of the exact Q2 solution at the DG nodes
+        uh, _, _, q = solve_poisson(lnodes, u_quadratic, f_quadratic)
+        node_values = gridap_node_values(uh, q)
+        @test length(node_values) == lnodes.n_independent + lnodes.n_hanging
+        @test all(node_values[k] ≈ u_quadratic(lnodes.coordinates[:, k])
+                  for k in eachindex(node_values))
+        φ = zeros(n, n, n_elements)
+        q2_to_dg!(φ, node_values, lnodes, dg_nodes)
+        @test maximum(abs(φ[i, j, e] - u_quadratic(x_dg(i, j, e)))
+                      for e in 1:n_elements, j in 1:n, i in 1:n) < 1e-12
+        ∇φ = zeros(2, n, n, n_elements)
+        q2_gradient_to_dg!(∇φ, node_values, lnodes, semi)
+        gradient(x) = SVector(2 + x[1] + 1.5 * x[2], -3 + 1.5 * x[1] - 2 * x[2])
+        @test maximum(maximum(abs, ∇φ[:, i, j, e] - gradient(x_dg(i, j, e)))
+                      for e in 1:n_elements, j in 1:n, i in 1:n) < 1e-10
+    end
+
+    @testset "Poisson problem with a source from a Trixi.jl simulation" begin
+        mesh = five_tree_mesh(:C)
+        equations = CompressibleEulerEquations2D(1.4)
+        initial_condition = (x, t, equations) -> prim2cons(SVector(1 +
+                                                                   0.5 *
+                                                                   exp(-20 * sum(abs2, x)),
+                                                                   0.0, 0.0, 1.0),
+                                                           equations)
+        semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition,
+                                            DGSEM(polydeg = 2);
+                                            boundary_conditions = boundary_condition_do_nothing)
+        u_ode = Trixi.compute_coefficients(0.0, semi)
+        density_deviation = dg_nodal_values((u, equations) -> u[1] - 1, u_ode, semi)
+        lnodes = P4estLnodesQ2(mesh)
+        model = gridap_model(lnodes)
+        source = gridap_dg_function(gridap_dg_q2_space(model),
+                                    dg_to_q2_elements(density_deviation,
+                                                      semi.solver.basis.nodes))
+        q = gridap_q2_space(lnodes, model; dirichlet_tags = BOX_SIDES)
+        U = TrialFESpace(q.space, 0.0)
+        dΩ = Measure(Triangulation(model), 4)
+        φh = Gridap.solve(AffineFEOperator((u, v) -> ∫(∇(v) ⋅ ∇(u)) * dΩ,
+                                           v -> ∫(v * source) * dΩ, U, q.space))
+        node_values = gridap_node_values(φh, q)
+        # Positive source and zero boundary values: positive potential, maximal near the
+        # center, vanishing on the boundary
+        @test minimum(node_values) > -1e-12
+        @test node_values[argmin(map(k -> sum(abs2, lnodes.coordinates[:, k]),
+                                     eachindex(node_values)))]≈maximum(node_values) rtol=0.05
+        @test all(iszero, node_values[q.node_to_dof .< 0])
+    end
 end
 
 end # module

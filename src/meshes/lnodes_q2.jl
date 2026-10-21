@@ -277,7 +277,7 @@ the mesh. Faces and vertices are labeled with the boundary entities of `lnodes`,
 vertex at the junction of two boundaries belongs to both tags. Faces at hanging nodes are
 interior faces.
 
-This function requires Gridap.jl to be loaded (`using Gridap`).
+This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function gridap_model end
 
@@ -295,7 +295,39 @@ Return a named tuple with
 - `node_to_dof`: degree of freedom of each node in `unconstrained`, positive for free and
   negative for Dirichlet degrees of freedom.
 
-This function requires Gridap.jl to be loaded (`using Gridap`).
+This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function gridap_q2_space end
+"""
+    gridap_dg_q2_space(model)
+
+Discontinuous Q2 space on the Gridap.jl `model` created by [`gridap_model`](@ref), used
+to represent DG data in Gridap.jl, see [`gridap_dg_function`](@ref).
+
+This function requires Gridap.jl to be loaded (`import Gridap`).
+"""
+function gridap_dg_q2_space end
+
+"""
+    gridap_dg_function(dg_space, element_values)
+
+Create a Gridap.jl `FEFunction` on the discontinuous Q2 space `dg_space` from
+[`gridap_dg_q2_space`](@ref) from the `9 × n_elements` matrix `element_values` as returned
+by [`dg_to_q2_elements`](@ref). For DG data of `polydeg = 2`, it represents the DG
+polynomials exactly, e.g., as a coefficient or source term in a weak form.
+
+This function requires Gridap.jl to be loaded (`import Gridap`).
+"""
+function gridap_dg_function end
+
+"""
+    gridap_node_values(uh, q2_space)
+
+Values of the Gridap.jl function `uh` at all nodes of the `P4estLnodesQ2` used to create
+`q2_space` with [`gridap_q2_space`](@ref), including the hanging nodes. The result can be
+transferred to DG nodes with [`q2_to_dg!`](@ref) and [`q2_gradient_to_dg!`](@ref).
+
+This function requires Gridap.jl to be loaded (`import Gridap`).
+"""
+function gridap_node_values end
 end # @muladd

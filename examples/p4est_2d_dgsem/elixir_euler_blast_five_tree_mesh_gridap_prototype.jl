@@ -4,6 +4,14 @@ using AeroTrixi
 using Plots
 using LinearAlgebra: cholesky, Symmetric
 
+# Gridap.jl exports names such as `solve` that clash with the packages used for the time
+# integration. `import Gridap` loads the package (and the Gridap.jl extension of
+# AeroTrixi.jl) without bringing its names into scope; only the names needed below are
+# imported explicitly.
+import Gridap
+using Gridap: Triangulation, Measure, TrialFESpace, AffineFEOperator, FEFunction,
+              get_matrix, get_vector, num_free_dofs, ∫, ∇, ⋅
+
 ###############################################################################
 # Prototype of the coupling between Trixi.jl and Gridap.jl.
 #
@@ -11,8 +19,10 @@ using LinearAlgebra: cholesky, Symmetric
 #    `elixir_euler_blast_wave_five_trees_amr.jl`.
 # 2. Take the adapted mesh, create the continuous Q2 node numbering with hanging-node
 #    constraints, and the corresponding Gridap.jl model and finite element space.
-# 3. Solve the Poisson problem -Δφ = f with φ = 0 on the boundary, using a Cholesky
-#    factorization, and plot φ on the adapted mesh.
+# 3. Transfer the density deviation ρ - 1 from the DG solution to Gridap.jl and solve the
+#    Poisson problem -Δφ = ρ - 1 with φ = 0 on the boundary, using a Cholesky
+#    factorization.
+# 4. Transfer φ and its gradient back to the DG nodes and plot them.
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
 # OrdinaryDiffEqLowStorageRK.jl, Plots.jl, and Gridap.jl in the active environment.
@@ -24,12 +34,6 @@ trixi_include(joinpath(@__DIR__, "elixir_euler_blast_wave_five_trees_amr.jl"))
 
 ###############################################################################
 # continuous Q2 discretization on the adapted mesh
-
-# Gridap.jl is loaded only now and with explicit imports, since it exports names such
-# as `solve` that clash with the packages used for the time integration above
-using Gridap: Gridap, Triangulation, Measure, TrialFESpace, AffineFEOperator, FEFunction,
-              get_matrix, get_vector, num_free_dofs, interpolate, get_free_dof_values,
-              get_dirichlet_dof_values, ∫, ∇, ⋅
 
 # Node numbering with hanging nodes and their constraints, derived from `p4est_lnodes`
 lnodes = P4estLnodesQ2(mesh)
@@ -43,13 +47,16 @@ V = q2.space
 U = TrialFESpace(V, 0.0)
 
 ###############################################################################
-# Poisson problem -Δφ = f, φ = 0 on the boundary
+# DG → Gridap: density deviation as source term
 
-# A positive and a negative Gaussian source
-function source(x)
-    return 50 * exp(-40 * ((x[1] - 0.3)^2 + (x[2] - 0.2)^2)) -
-           30 * exp(-60 * ((x[1] + 0.4)^2 + (x[2] + 0.3)^2))
-end
+# Density deviation at the DG nodes, interpolated to the Q2 nodes of each element, and
+# represented as a discontinuous Q2 function in Gridap.jl
+density_deviation = dg_nodal_values((u, equations) -> u[1] - 1, sol.u[end], semi)
+source = gridap_dg_function(gridap_dg_q2_space(model),
+                            dg_to_q2_elements(density_deviation, solver.basis.nodes))
+
+###############################################################################
+# Poisson problem -Δφ = ρ - 1, φ = 0 on the boundary
 
 Ω = Triangulation(model)
 dΩ = Measure(Ω, 4)
@@ -67,37 +74,31 @@ factorization = cholesky(Symmetric(A))
 println("Poisson problem: ", lnodes, ", ", num_free_dofs(V), " free degrees of freedom")
 
 ###############################################################################
-# plot the density of the blast wave and the potential on the adapted mesh
+# Gridap → DG: potential and its gradient at the DG nodes
 
-# Values of φ at all Q2 nodes, including the hanging nodes
-φ_nodes = interpolate(φh, q2.unconstrained)
-free_values = get_free_dof_values(φ_nodes)
-dirichlet_values = get_dirichlet_dof_values(φ_nodes)
-node_values = [dof > 0 ? free_values[dof] : dirichlet_values[-dof]
-               for dof in q2.node_to_dof]
+φ_nodes = gridap_node_values(φh, q2)
+n_nodes_dg = length(solver.basis.nodes)
+φ_dg = zeros(n_nodes_dg, n_nodes_dg, Trixi.ncells(mesh))
+q2_to_dg!(φ_dg, φ_nodes, lnodes, solver.basis.nodes)
+∇φ_dg = zeros(2, n_nodes_dg, n_nodes_dg, Trixi.ncells(mesh))
+q2_gradient_to_dg!(∇φ_dg, φ_nodes, lnodes, semi)
 
-# For plotting, interpolate the Q2 polynomial of each element to the nodes of a Trixi.jl
-# scalar field on the same mesh; the elements of Trixi.jl and Gridap.jl coincide
-equations_plot = LinearScalarAdvectionEquation2D(0.0, 0.0)
-semi_plot = SemidiscretizationHyperbolic(mesh, equations_plot,
-                                         (x, t, equations) -> SVector(0.0),
-                                         DGSEM(polydeg = Trixi.polydeg(solver));
+###############################################################################
+# plot the density, the potential, and the magnitude of its gradient
+
+# Scalar DG fields on the same mesh are plotted with Trixi.jl's plotting
+semi_plot = SemidiscretizationHyperbolic(mesh, LinearScalarAdvectionEquation2D(0.0, 0.0),
+                                         (x, t, equations) -> SVector(0.0), solver;
                                          boundary_conditions)
-lagrange_q2(ξ) = SVector(ξ * (ξ - 1) / 2, 1 - ξ^2, ξ * (ξ + 1) / 2) # nodes -1, 0, 1
-nodes_plot = semi_plot.solver.basis.nodes
-L = reduce(vcat, (lagrange_q2(ξ)' for ξ in nodes_plot))
-φ_plot = zeros(1, length(nodes_plot), length(nodes_plot), Trixi.ncells(mesh))
-for element in axes(φ_plot, 4)
-    element_values = reshape(node_values[lnodes.element_nodes[:, element]], 3, 3)
-    φ_plot[1, :, :, element] .= L * element_values * L'
-end
+plot_scalar(values) = PlotData2D(vec(values), semi_plot)["scalar"]
 
 pd = PlotData2D(sol)
 plot_density = plot(pd["rho"], title = "density at t = $(sol.t[end])")
 plot!(plot_density, getmesh(pd), linecolor = :white, linewidth = 0.3)
-pd_φ = PlotData2D(vec(φ_plot), semi_plot)
-plot_potential = plot(pd_φ["scalar"], title = "Poisson solution φ (Q2, Gridap.jl)",
-                      color = :balance, clims = (-1, 1) .* maximum(abs, φ_plot))
+plot_potential = plot(plot_scalar(φ_dg), title = "potential φ (Q2, Gridap.jl)",
+                      color = :balance, clims = (-1, 1) .* maximum(abs, φ_dg))
 plot!(plot_potential, getmesh(pd), linecolor = :black, linewidth = 0.2)
-plot(plot_density, plot_potential, layout = (1, 2), size = (1100, 450))
+gradient_magnitude = sqrt.(∇φ_dg[1, :, :, :] .^ 2 .+ ∇φ_dg[2, :, :, :] .^ 2)
+plot_gradient = plot(plot_scalar(gradient_magnitude), title = "|∇φ|")
+plot(plot_density, plot_potential, plot_gradient, layout = (1, 3), size = (1600, 450))
 savefig(joinpath("out", "blast_five_tree_mesh_gridap_prototype.png"))

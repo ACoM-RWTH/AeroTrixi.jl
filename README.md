@@ -17,7 +17,7 @@ In the future, we plan to add more features for nonideal and rarefied gases, for
 - **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
 - **Unstructured `P4estMesh` from vertices**: [`p4est_mesh_from_vertices`](@ref) creates 2D meshes with full face and corner connectivity between trees, as required by continuous node numberings (`p4est_lnodes`); [`p4est_mesh_five_trees`](@ref) provides a five-block test mesh of the box `[-1, 1]^2`
 - **Continuous Q2 node numbering**: [`P4estLnodesQ2`](@ref) derives the degree-2 `p4est_lnodes` of a 2D `P4estMesh`, including hanging nodes with their linear constraints and boundary labels, as a basis for coupling to continuous finite elements
-- **Gridap.jl coupling** (package extension, loaded with `using Gridap`): [`gridap_model`](@ref) and [`gridap_q2_space`](@ref) create a Gridap model with boundary labels and a continuous Q2 space with hanging-node constraints from a [`P4estLnodesQ2`](@ref)
+- **Gridap.jl coupling** (package extension, loaded with `import Gridap`): [`gridap_model`](@ref) and [`gridap_q2_space`](@ref) create a Gridap model with boundary labels and a continuous Q2 space with hanging-node constraints from a [`P4estLnodesQ2`](@ref); data are transferred between Trixi.jl's DG nodes and Gridap.jl with [`dg_nodal_values`](@ref), [`dg_to_q2_elements`](@ref), [`gridap_dg_function`](@ref), [`gridap_node_values`](@ref), [`q2_to_dg!`](@ref), and [`q2_gradient_to_dg!`](@ref)
 
 ## Installation
 
