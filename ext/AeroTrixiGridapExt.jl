@@ -9,11 +9,10 @@ using Gridap.Geometry: UnstructuredGrid, UnstructuredGridTopology,
                        UnstructuredDiscreteModel, FaceLabeling, Triangulation, get_faces,
                        num_faces
 using Gridap.FESpaces: FESpaceWithLinearConstraints, UnconstrainedFESpace, CellFE,
-                       H1Conformity, compute_cell_space, FESpace, FEFunction,
+                       H1Conformity, compute_cell_space, FEFunction,
                        interpolate_everywhere, get_free_dof_values,
                        get_dirichlet_dof_values,
-                       get_cell_dof_ids, num_free_dofs
-using Gridap.ReferenceFEs: ReferenceFE, lagrangian
+                       num_free_dofs, num_dirichlet_dofs
 
 # Node slots (one-based, lexicographic as in Trixi.jl) of the local nodes of a Gridap Q2
 # quadrilateral: four vertices, the midpoints of the edges (bottom, top, left, right), and
@@ -145,21 +144,19 @@ function AeroTrixi.gridap_q2_space(lnodes::P4estLnodesQ2, model;
     return (; space, unconstrained, node_to_dof)
 end
 
-function AeroTrixi.gridap_dg_q2_space(model)
-    return FESpace(model, ReferenceFE(lagrangian, Float64, 2); conformity = :L2)
-end
-
-function AeroTrixi.gridap_dg_function(dg_space, element_values::AbstractMatrix)
-    cell_dofs = get_cell_dof_ids(dg_space)
-    @assert size(element_values)==(9, length(cell_dofs)) "element_values must be 9 × n_elements"
-    free_values = zeros(eltype(element_values), num_free_dofs(dg_space))
-    for element in eachindex(cell_dofs)
-        dofs = cell_dofs[element]
-        for i in 1:9
-            free_values[dofs[i]] = element_values[GRIDAP_Q2_TO_LEXICOGRAPHIC[i], element]
+function AeroTrixi.gridap_q2_function(node_values, q2_space)
+    @assert length(node_values)==length(q2_space.node_to_dof) "node_values must contain all nodes"
+    space = q2_space.unconstrained
+    free_values = zeros(eltype(node_values), num_free_dofs(space))
+    dirichlet_values = zeros(eltype(node_values), num_dirichlet_dofs(space))
+    for (node, dof) in enumerate(q2_space.node_to_dof)
+        if dof > 0
+            free_values[dof] = node_values[node]
+        else
+            dirichlet_values[-dof] = node_values[node]
         end
     end
-    return FEFunction(dg_space, free_values)
+    return FEFunction(space, free_values, dirichlet_values)
 end
 
 function AeroTrixi.gridap_node_values(uh, q2_space)

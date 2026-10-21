@@ -30,7 +30,7 @@ using Trixi: @printf, @sprintf,
              p4est_lnodes_destroy, p4est_quadrant_t, P4EST_CONNECT_FULL,
              P4EST_MAXLEVEL, load_pointerwrapper_tree, unsafe_wrap_sc,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
-             nnodes, get_node_vars, polynomial_interpolation_matrix
+             nnodes, get_node_vars
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
@@ -71,7 +71,7 @@ export CompressibleEulerEquationsMs1T2D
 export flux_oblapenko_etal, flux_oblapenko_etal_taylor
 export p4est_mesh_from_vertices, p4est_mesh_five_trees
 export P4estLnodesQ2, apply_hanging_constraints!, gridap_model, gridap_q2_space
-export dg_nodal_values, dg_to_q2_elements, q2_to_dg!, q2_gradient_to_dg!
-export gridap_dg_q2_space, gridap_dg_function, gridap_node_values
+export dg_nodal_values, dg_to_q2!, q2_to_dg!, q2_gradient_to_dg!
+export gridap_q2_function, gridap_node_values
 
 end

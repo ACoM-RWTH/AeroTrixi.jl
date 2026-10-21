@@ -15,14 +15,15 @@ using Gridap: Triangulation, Measure, TrialFESpace, AffineFEOperator, FEFunction
 ###############################################################################
 # Prototype of the coupling between Trixi.jl and Gridap.jl.
 #
-# 1. Run the circular blast wave on the five-tree mesh with AMR, exactly as in
-#    `elixir_euler_blast_wave_five_trees_amr.jl`.
+# 1. Run the circular blast wave on the five-tree mesh with AMR as in
+#    `elixir_euler_blast_wave_five_trees_amr.jl`, but with polynomial degree 2, so that
+#    the DG nodes of each element coincide with its Q2 nodes.
 # 2. Take the adapted mesh, create the continuous Q2 node numbering with hanging-node
 #    constraints, and the corresponding Gridap.jl model and finite element space.
-# 3. Transfer the density deviation ρ - 1 from the DG solution to Gridap.jl and solve the
-#    Poisson problem -Δφ = ρ - 1 with φ = 0 on the boundary, using a Cholesky
-#    factorization.
-# 4. Transfer φ and its gradient back to the DG nodes and plot them.
+# 3. Transfer the density deviation ρ - 1 from the DG nodes to the Q2 nodes (average of
+#    the elements sharing a node) and solve the Poisson problem -Δφ = ρ - 1 with φ = 0 on
+#    the boundary, using a Cholesky factorization.
+# 4. Inject φ into the DG nodes, compute its gradient there, and plot both.
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
 # OrdinaryDiffEqLowStorageRK.jl, Plots.jl, and Gridap.jl in the active environment.
@@ -30,7 +31,10 @@ using Gridap: Triangulation, Measure, TrialFESpace, AffineFEOperator, FEFunction
 ###############################################################################
 # run the blast wave
 
-trixi_include(joinpath(@__DIR__, "elixir_euler_blast_wave_five_trees_amr.jl"))
+trixi_include(joinpath(@__DIR__, "elixir_euler_blast_wave_five_trees_amr.jl"),
+              basis = LobattoLegendreBasis(2),
+              mesh = p4est_mesh_five_trees(l = 0.4, trees_per_block = 2, polydeg = 2,
+                                           initial_refinement_level = 1))
 
 ###############################################################################
 # continuous Q2 discretization on the adapted mesh
@@ -49,11 +53,10 @@ U = TrialFESpace(V, 0.0)
 ###############################################################################
 # DG → Gridap: density deviation as source term
 
-# Density deviation at the DG nodes, interpolated to the Q2 nodes of each element, and
-# represented as a discontinuous Q2 function in Gridap.jl
+# Density deviation at the DG nodes, averaged at the Q2 nodes shared by several elements
 density_deviation = dg_nodal_values((u, equations) -> u[1] - 1, sol.u[end], semi)
-source = gridap_dg_function(gridap_dg_q2_space(model),
-                            dg_to_q2_elements(density_deviation, solver.basis.nodes))
+source_nodes = dg_to_q2!(zeros(length(q2.node_to_dof)), density_deviation, lnodes)
+source = gridap_q2_function(source_nodes, q2)
 
 ###############################################################################
 # Poisson problem -Δφ = ρ - 1, φ = 0 on the boundary
@@ -74,14 +77,11 @@ factorization = cholesky(Symmetric(A))
 println("Poisson problem: ", lnodes, ", ", num_free_dofs(V), " free degrees of freedom")
 
 ###############################################################################
-# Gridap → DG: potential and its gradient at the DG nodes
+# Gridap → DG: potential injected into the DG nodes, and its gradient there
 
 φ_nodes = gridap_node_values(φh, q2)
-n_nodes_dg = length(solver.basis.nodes)
-φ_dg = zeros(n_nodes_dg, n_nodes_dg, Trixi.ncells(mesh))
-q2_to_dg!(φ_dg, φ_nodes, lnodes, solver.basis.nodes)
-∇φ_dg = zeros(2, n_nodes_dg, n_nodes_dg, Trixi.ncells(mesh))
-q2_gradient_to_dg!(∇φ_dg, φ_nodes, lnodes, semi)
+φ_dg = q2_to_dg!(zeros(3, 3, Trixi.ncells(mesh)), φ_nodes, lnodes)
+∇φ_dg = q2_gradient_to_dg!(zeros(2, 3, 3, Trixi.ncells(mesh)), φ_nodes, lnodes, semi)
 
 ###############################################################################
 # plot the density, the potential, and the magnitude of its gradient
