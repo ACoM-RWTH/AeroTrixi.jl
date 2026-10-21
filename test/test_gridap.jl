@@ -212,6 +212,27 @@ end
         @test maximum(maximum(abs, ∇φ[:, i, j, e] - gradient(x_dg(i, j, e)))
                       for e in 1:n_elements, j in 1:3, i in 1:3) < 1e-10
 
+        # Q2 → DG directly into a solution vector: velocity = ∇φ, pressure = φ
+        equations = CompressibleEulerEquations2D(1.4)
+        semi_euler = SemidiscretizationHyperbolic(mesh, equations,
+                                                  initial_condition_constant,
+                                                  DGSEM(polydeg = 2);
+                                                  boundary_conditions = boundary_condition_do_nothing)
+        u_euler = Trixi.compute_coefficients(0.0, semi_euler)
+        density = copy(Trixi.wrap_array(u_euler, semi_euler)[1, :, :, :])
+        q2_to_dg!(u_euler, semi_euler, φ_nodes, lnodes) do u, φ, ∇φ, equations
+            return prim2cons(SVector(u[1], ∇φ[1], ∇φ[2], φ), equations)
+        end
+        u = Trixi.wrap_array(u_euler, semi_euler)
+        @test u[1, :, :, :] == density
+        @test maximum(maximum(abs,
+                              cons2prim(Trixi.get_node_vars(u, equations,
+                                                            semi_euler.solver, i, j, e),
+                                        equations) -
+                              SVector(density[i, j, e], gradient(x_dg(i, j, e))...,
+                                      u_quadratic(x_dg(i, j, e))))
+                      for e in 1:n_elements, j in 1:3, i in 1:3) < 1e-10
+
         # The node-to-node transfer requires polydeg = 2
         @test_throws AssertionError q2_to_dg!(zeros(4, 4, n_elements), φ_nodes, lnodes)
         semi3 = SemidiscretizationHyperbolic(mesh,

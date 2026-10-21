@@ -103,28 +103,64 @@ function q2_gradient_to_dg!(dg_gradients::AbstractArray{<:Any, 4}, node_values,
     check_q2_semi(semi)
     @assert length(node_values)==n_nodes(lnodes) "node_values must contain all nodes"
     _, _, solver, cache = mesh_equations_solver_cache(semi)
+    for element in axes(dg_gradients, 4), j in 1:3, i in 1:3
+        gradient = q2_gradient_at_node(node_values, lnodes, solver, cache, i, j,
+                                       element)
+        dg_gradients[1, i, j, element] = gradient[1]
+        dg_gradients[2, i, j, element] = gradient[2]
+    end
+    return dg_gradients
+end
+
+"""
+    q2_to_dg!(func, u_ode, semi, node_values, lnodes::P4estLnodesQ2)
+
+Write a Q2 function with values `node_values` at the nodes of `lnodes` into the solution
+vector `u_ode` of `semi` (DG with `polydeg = 2`). At each DG node, the new state is
+`func(u_node, φ, ∇φ, equations)`, where `u_node` is the current state, `φ` the injected
+value, and `∇φ` the physical gradient as in [`q2_gradient_to_dg!`](@ref). For example,
+```julia
+q2_to_dg!(u_ode, semi, φ_nodes, lnodes) do u, φ, ∇φ, equations
+    return prim2cons(SVector(u[1], ∇φ[1], ∇φ[2], φ), equations)
+end
+```
+keeps the density and sets the velocity to `∇φ` and the pressure to `φ`.
+"""
+function q2_to_dg!(func, u_ode, semi, node_values, lnodes::P4estLnodesQ2)
+    check_q2_semi(semi)
+    @assert length(node_values)==n_nodes(lnodes) "node_values must contain all nodes"
+    _, equations, solver, cache = mesh_equations_solver_cache(semi)
+    u = wrap_array(u_ode, semi)
+    @assert size(u, 4)==size(lnodes.element_nodes, 2) "number of elements does not match"
+    element_nodes = lnodes.element_nodes
+    for element in axes(u, 4), j in 1:3, i in 1:3
+        φ = node_values[element_nodes[i + 3 * (j - 1), element]]
+        ∇φ = q2_gradient_at_node(node_values, lnodes, solver, cache, i, j, element)
+        u_node = get_node_vars(u, equations, solver, i, j, element)
+        set_node_vars!(u, func(u_node, φ, ∇φ, equations), equations, solver, i, j,
+                       element)
+    end
+    return u_ode
+end
+
+# Physical gradient of the Q2 function at DG node `(i, j)` of `element`, using the
+# derivative matrix and metric terms of Trixi.jl
+@inline function q2_gradient_at_node(node_values, lnodes, solver, cache, i, j, element)
     @unpack contravariant_vectors, inverse_jacobian = cache.elements
     element_nodes = lnodes.element_nodes
     D = solver.basis.derivative_matrix
-    for element in axes(dg_gradients, 4), j in 1:3, i in 1:3
-        # Derivatives with respect to the reference coordinates
-        dξ = zero(eltype(dg_gradients))
-        dη = zero(eltype(dg_gradients))
-        for k in 1:3
-            dξ += D[i, k] * node_values[element_nodes[k + 3 * (j - 1), element]]
-            dη += D[j, k] * node_values[element_nodes[i + 3 * (k - 1), element]]
-        end
-        # ∂/∂x_d = (Ja^1_d ∂/∂ξ + Ja^2_d ∂/∂η) / J
-        for d in 1:2
-            dg_gradients[d, i, j, element] = inverse_jacobian[i, j, element] *
-                                             (contravariant_vectors[d, 1, i, j,
-                                                                    element] *
-                                              dξ +
-                                              contravariant_vectors[d, 2, i, j,
-                                                                    element] *
-                                              dη)
-        end
+    # Derivatives with respect to the reference coordinates
+    dξ = zero(eltype(node_values))
+    dη = zero(eltype(node_values))
+    for k in 1:3
+        dξ += D[i, k] * node_values[element_nodes[k + 3 * (j - 1), element]]
+        dη += D[j, k] * node_values[element_nodes[i + 3 * (k - 1), element]]
     end
-    return dg_gradients
+    # ∂/∂x_d = (Ja^1_d ∂/∂ξ + Ja^2_d ∂/∂η) / J
+    return inverse_jacobian[i, j, element] *
+           SVector(contravariant_vectors[1, 1, i, j, element] * dξ +
+                   contravariant_vectors[1, 2, i, j, element] * dη,
+                   contravariant_vectors[2, 1, i, j, element] * dξ +
+                   contravariant_vectors[2, 2, i, j, element] * dη)
 end
 end # @muladd

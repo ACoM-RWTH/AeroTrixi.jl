@@ -23,7 +23,8 @@ using Gridap: Triangulation, Measure, TrialFESpace, AffineFEOperator, FEFunction
 # 3. Transfer the density deviation ρ - 1 from the DG nodes to the Q2 nodes (average of
 #    the elements sharing a node) and solve the Poisson problem -Δφ = ρ - 1 with φ = 0 on
 #    the boundary, using a Cholesky factorization.
-# 4. Inject φ into the DG nodes, compute its gradient there, and plot both.
+# 4. Write φ and its gradient back into the Euler solution vector, as pressure and
+#    velocity, keeping the density, and plot the solution.
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
 # OrdinaryDiffEqLowStorageRK.jl, Plots.jl, and Gridap.jl in the active environment.
@@ -77,28 +78,28 @@ factorization = cholesky(Symmetric(A))
 println("Poisson problem: ", lnodes, ", ", num_free_dofs(V), " free degrees of freedom")
 
 ###############################################################################
-# Gridap → DG: potential injected into the DG nodes, and its gradient there
+# Gridap → DG: write φ and ∇φ into the Euler solution
 
+# Values of φ at all Q2 nodes, including the hanging nodes
 φ_nodes = gridap_node_values(φh, q2)
-φ_dg = q2_to_dg!(zeros(3, 3, Trixi.ncells(mesh)), φ_nodes, lnodes)
-∇φ_dg = q2_gradient_to_dg!(zeros(2, 3, 3, Trixi.ncells(mesh)), φ_nodes, lnodes, semi)
+
+# At each DG node, φ is injected and ∇φ is the local derivative. For demonstration, the
+# final blast wave solution is overwritten: the density is kept, the velocity is set to
+# ∇φ, and the pressure to φ.
+q2_to_dg!(sol.u[end], semi, φ_nodes, lnodes) do u, φ, ∇φ, equations
+    return prim2cons(SVector(u[1], ∇φ[1], ∇φ[2], φ), equations)
+end
 
 ###############################################################################
-# plot the density, the potential, and the magnitude of its gradient
-
-# Scalar DG fields on the same mesh are plotted with Trixi.jl's plotting
-semi_plot = SemidiscretizationHyperbolic(mesh, LinearScalarAdvectionEquation2D(0.0, 0.0),
-                                         (x, t, equations) -> SVector(0.0), solver;
-                                         boundary_conditions)
-plot_scalar(values) = PlotData2D(vec(values), semi_plot)["scalar"]
+# plot the density, the potential (pressure), and its gradient (velocity)
 
 pd = PlotData2D(sol)
 plot_density = plot(pd["rho"], title = "density at t = $(sol.t[end])")
 plot!(plot_density, getmesh(pd), linecolor = :white, linewidth = 0.3)
-plot_potential = plot(plot_scalar(φ_dg), title = "potential φ (Q2, Gridap.jl)",
-                      color = :balance, clims = (-1, 1) .* maximum(abs, φ_dg))
+plot_potential = plot(pd["p"], title = "pressure ← φ (Q2, Gridap.jl)", color = :balance,
+                      clims = (-1, 1) .* maximum(abs, φ_nodes))
 plot!(plot_potential, getmesh(pd), linecolor = :black, linewidth = 0.2)
-gradient_magnitude = sqrt.(∇φ_dg[1, :, :, :] .^ 2 .+ ∇φ_dg[2, :, :, :] .^ 2)
-plot_gradient = plot(plot_scalar(gradient_magnitude), title = "|∇φ|")
-plot(plot_density, plot_potential, plot_gradient, layout = (1, 3), size = (1600, 450))
+plot_v1 = plot(pd["v1"], title = "v1 ← ∂φ/∂x", color = :balance)
+plot_v2 = plot(pd["v2"], title = "v2 ← ∂φ/∂y", color = :balance)
+plot(plot_density, plot_potential, plot_v1, plot_v2, layout = (2, 2), size = (1100, 900))
 savefig(joinpath("out", "blast_five_tree_mesh_gridap_prototype.png"))

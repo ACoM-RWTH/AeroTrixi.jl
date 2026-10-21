@@ -30,7 +30,7 @@ using Trixi: @printf, @sprintf,
              p4est_lnodes_destroy, p4est_quadrant_t, P4EST_CONNECT_FULL,
              P4EST_MAXLEVEL, load_pointerwrapper_tree, unsafe_wrap_sc,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
-             nnodes, get_node_vars
+             nnodes, get_node_vars, set_node_vars!
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
