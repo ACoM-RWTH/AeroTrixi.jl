@@ -9,14 +9,9 @@
 # continuous Q2 nodes of a `P4estLnodesQ2`. Both use the same elements, and the DG nodes
 # (-1, 0, 1) of each element coincide with its Q2 nodes, so that the transfers are simple
 # node-to-node operations:
-# - DG → Q2: each Q2 node gets the average of the DG values of all elements sharing it,
+# - DG → Q2: each Q2 node gets the average of the DG values of all elements sharing it;
+#   the hanging nodes then get the values of the coarse faces they lie on,
 # - Q2 → DG: each DG node gets the value of its Q2 node (injection).
-
-# Derivatives of the Lagrange polynomials of the nodes (-1, 0, 1) at these nodes, i.e.,
-# the derivative matrix of the DG basis with `polydeg = 2`
-const Q2_DERIVATIVE_MATRIX = [-1.5 2.0 -0.5
-                              -0.5 0.0 0.5
-                              0.5 -2.0 1.5]
 
 function check_q2_dg_nodes(dg_values, lnodes)
     @assert size(dg_values, ndims(dg_values))==size(lnodes.element_nodes, 2) "number of elements does not match"
@@ -52,9 +47,12 @@ end
 """
     dg_to_q2!(node_values, dg_values, lnodes::P4estLnodesQ2)
 
-Transfer DG nodal data of size `(3, 3, n_elements)` (DG with `polydeg = 2`) to the nodes
-of `lnodes`: each node gets the average of the DG values at this node of all elements
-sharing it. A hanging node belongs to a single element and gets its DG value.
+Transfer DG nodal data of size `(3, 3, n_elements)` (DG with `polydeg = 2`) to a continuous
+Q2 field at the nodes of `lnodes`. Each independent node gets the average of the DG values
+at this node of all elements sharing it. The hanging nodes then get the values of the
+quadratic on the coarse face they lie on, interpolated from the averaged values at the
+nodes of this face (see [`apply_hanging_constraints!`](@ref)), so that the field is
+continuous across hanging faces.
 """
 function dg_to_q2!(node_values, dg_values::AbstractArray{<:Any, 3},
                    lnodes::P4estLnodesQ2)
@@ -69,6 +67,8 @@ function dg_to_q2!(node_values, dg_values::AbstractArray{<:Any, 3},
         counts[node] += 1
     end
     node_values ./= counts
+    # Values at the hanging nodes from the coarse faces
+    apply_hanging_constraints!(node_values, lnodes)
     return node_values
 end
 
@@ -93,19 +93,19 @@ end
     q2_gradient_to_dg!(dg_gradients, node_values, lnodes::P4estLnodesQ2, semi)
 
 Physical gradient of the Q2 function with values `node_values` at the DG nodes of `semi`
-(DG with `polydeg = 2`), of size `(2, 3, 3, n_elements)`. This is the gradient that
-Trixi.jl computes from the injected values with its derivative matrix and metric terms;
-it is discontinuous between elements.
+(DG with `polydeg = 2`), of size `(2, 3, 3, n_elements)`. It is the local derivative of
+the injected values within each element, computed with the derivative matrix and metric
+terms of Trixi.jl, and discontinuous between elements.
 """
 function q2_gradient_to_dg!(dg_gradients::AbstractArray{<:Any, 4}, node_values,
                             lnodes::P4estLnodesQ2, semi)
     check_q2_dg_nodes(dg_gradients, lnodes)
     check_q2_semi(semi)
     @assert length(node_values)==n_nodes(lnodes) "node_values must contain all nodes"
-    _, _, _, cache = mesh_equations_solver_cache(semi)
+    _, _, solver, cache = mesh_equations_solver_cache(semi)
     @unpack contravariant_vectors, inverse_jacobian = cache.elements
     element_nodes = lnodes.element_nodes
-    D = Q2_DERIVATIVE_MATRIX
+    D = solver.basis.derivative_matrix
     for element in axes(dg_gradients, 4), j in 1:3, i in 1:3
         # Derivatives with respect to the reference coordinates
         dξ = zero(eltype(dg_gradients))

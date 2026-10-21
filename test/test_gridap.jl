@@ -177,16 +177,27 @@ end
         uh = gridap_q2_function(node_values, q)
         @test sqrt(sum(∫((uh - u_quadratic) * (uh - u_quadratic)) * dΩ)) < 1e-12
 
-        # DG → Q2: each node gets the mean of the adjacent element values
+        # DG → Q2: each independent node gets the mean of the adjacent element values,
+        # and each hanging node the value on its coarse face
         element_ids = [Float64(e) for i in 1:3, j in 1:3, e in 1:n_elements]
         mean_ids = dg_to_q2!(zeros(n_nodes), element_ids, lnodes)
         adjacent = [Int[] for _ in 1:n_nodes]
         for e in 1:n_elements, node in lnodes.element_nodes[:, e]
             push!(adjacent[node], e)
         end
-        @test all(mean_ids[k] ≈ sum(adjacent[k]) / length(adjacent[k]) for k in 1:n_nodes)
-        @test all(length(adjacent[k]) == 1
-                  for k in (lnodes.n_independent + 1):n_nodes)
+        @test all(mean_ids[k] ≈ sum(adjacent[k]) / length(adjacent[k])
+                  for k in 1:(lnodes.n_independent))
+        @test all(mean_ids[lnodes.n_independent + k] ≈
+                  sum(lnodes.hanging_coefficients[:, k] .*
+                      mean_ids[lnodes.hanging_masters[:, k]])
+                  for k in 1:(lnodes.n_hanging))
+
+        # The transferred field is continuous: it lies in the constrained space, i.e., it
+        # equals its interpolant there
+        source = gridap_q2_function(mean_ids, q)
+        source_constrained = interpolate_everywhere(source, q.space)
+        @test sqrt(sum(∫((source - source_constrained) * (source - source_constrained)) *
+                       dΩ)) < 1e-10
 
         # Q2 → DG: injection of the exact Q2 solution and its gradient
         φh, _, _, qφ = solve_poisson(lnodes, u_quadratic, f_quadratic)

@@ -304,7 +304,8 @@ function gridap_q2_space end
 Create a Gridap.jl `FEFunction` with the values `node_values` at all nodes of the
 `P4estLnodesQ2` used to create `q2_space` with [`gridap_q2_space`](@ref), e.g., DG data
 transferred with [`dg_to_q2!`](@ref). The function lives in the space without
-hanging-node constraints, so that the values at hanging nodes are kept as given.
+hanging-node constraints, i.e., the values at hanging nodes are used as given; with
+[`dg_to_q2!`](@ref), they satisfy the constraints.
 
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """
