@@ -342,7 +342,33 @@ The node numbering, Gridap model and spaces, and the Cholesky factorization of t
 are kept and only rebuilt when the mesh changes (detected with the `revision` counter of
 `p4est`).
 
+With the callback alone, φ and E are updated once per time step and are constant during the
+Runge-Kutta stages, which limits the coupled time integration to first order. For the full
+order of the method, update them on each stage with
+[`gridap_poisson_stage_update`](@ref); the callback then only acts at the start and after
+mesh changes.
+
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function GridapPoissonCallback end
+
+"""
+    gridap_poisson_stage_update(poisson_callback)
+
+Return the update of a [`GridapPoissonCallback`](@ref) for use as `stage_limiter!` of the
+time integration method, e.g.,
+```julia
+CarpenterKennedy2N54(; stage_limiter! = gridap_poisson_stage_update(poisson_callback),
+                     williamson_condition = false)
+```
+(SSPRK and low-storage methods of OrdinaryDiffEq.jl; with `williamson_condition = true`,
+the stage limiter is not called). The Poisson problem is then solved on each stage value
+before the right-hand side is evaluated, and on the solution at the end of each step, with
+the cached factorization. The callback is switched to act only at the start and after mesh
+changes, where it rebuilds the cached data and updates φ and E on the new mesh; keep it after
+the `AMRCallback` in the `CallbackSet`.
+
+This function requires Gridap.jl to be loaded (`import Gridap`).
+"""
+function gridap_poisson_stage_update end
 end # @muladd

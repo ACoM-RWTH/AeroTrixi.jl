@@ -10,9 +10,11 @@ import Gridap
 ###############################################################################
 # Euler equations with an electrostatic potential φ and field E = -∇φ.
 #
-# The state is (ρ, ρv1, ρv2, ρe, φ, E1, E2). After each time step (and at the start), a
-# callback solves the Poisson problem -Δφ = ρ - ρ0 with continuous Q2 finite elements in
-# Gridap.jl on the current, adapted mesh, and writes φ and E into the DG solution.
+# The state is (ρ, ρv1, ρv2, ρe, φ, E1, E2). On each Runge-Kutta stage, the Poisson problem
+# -Δφ = ρ - ρ0 is solved with continuous Q2 finite elements in Gridap.jl on the current,
+# adapted mesh, and φ and E are written into the DG solution. The matrix factorization is
+# reused until the mesh changes; after each mesh adaptation (and at the start), a callback
+# rebuilds it and updates φ and E on the new mesh.
 # The force of the field on the flow (`source_terms_electrostatic`) is switched off with
 # `coupling = 0`: the potential follows the density, but does not act on the flow yet.
 #
@@ -100,19 +102,21 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-# Poisson problem -Δφ = ρ - ρ0 with φ = 0 on all sides of the box, solved after each time
-# step. The default `write` sets the variables φ, E1, E2 of the DG solution.
+# Poisson problem -Δφ = ρ - ρ0 with φ = 0 on all sides of the box. The default `write` sets
+# the variables φ, E1, E2 of the DG solution.
 poisson_callback = GridapPoissonCallback(semi;
                                          source = (u, x, equations) -> SVector(u[1] -
                                                                                RHO_0),
                                          dirichlet_tags = (:x_neg, :x_pos, :y_neg,
-                                                           :y_pos),
-                                         interval = 1)
+                                                           :y_pos))
+# Solve the Poisson problem on each Runge-Kutta stage, called by the time integration method
+# as `stage_limiter!`; the callback then only acts after mesh changes
+poisson_stage_update = gridap_poisson_stage_update(poisson_callback)
 
 stepsize_callback = StepsizeCallback(cfl = 0.9)
 
 # The Poisson callback comes after the AMR callback, so that φ and E are recomputed on the
-# new mesh, and before saving the solution
+# new mesh before the next step
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         amr_callback, poisson_callback,
@@ -122,7 +126,10 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
-sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
+# The stage limiter is only called with `williamson_condition = false`
+sol = solve(ode,
+            CarpenterKennedy2N54(; stage_limiter! = poisson_stage_update,
+                                 williamson_condition = false);
             dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);
 

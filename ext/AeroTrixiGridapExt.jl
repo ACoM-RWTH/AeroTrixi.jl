@@ -205,8 +205,11 @@ mutable struct GridapPoissonUpdate{Source, Write, Tags}
     const dirichlet_tags :: Tags
     const interval       :: Int
     mesh_data            :: Any
-    n_setups             :: Int
-    n_solves             :: Int
+    # Set by `gridap_poisson_stage_update`: the Poisson problem is solved on each Runge-Kutta
+    # stage, and the callback only acts after mesh changes
+    stages   :: Bool
+    n_setups :: Int
+    n_solves :: Int
 end
 
 # By default, the potential and the field E = -∇φ are written into the variables φ, E1, E2
@@ -218,11 +221,25 @@ end
 function AeroTrixi.GridapPoissonCallback(semi; source, dirichlet_tags,
                                          write = default_poisson_write, interval = 1)
     update = GridapPoissonUpdate(source, write, Tuple(Symbol.(dirichlet_tags)),
-                                 Int(interval), nothing, 0, 0)
-    condition = (u, t, integrator) -> interval > 0 &&
-        (integrator.stats.naccept % interval == 0 || isfinished(integrator))
+                                 Int(interval), nothing, false, 0, 0)
+    condition = function (u, t, integrator)
+        if update.stages
+            # The stage updates keep φ and E up to date as long as the mesh is not changed
+            mesh, _, _, _ = mesh_equations_solver_cache(integrator.p)
+            return mesh_changed(update.mesh_data, mesh)
+        end
+        return interval > 0 &&
+               (integrator.stats.naccept % interval == 0 || isfinished(integrator))
+    end
     return DiscreteCallback(condition, update, save_positions = (false, false),
                             initialize = initialize_gridap_poisson!)
+end
+
+function AeroTrixi.gridap_poisson_stage_update(cb::DiscreteCallback{<:Any,
+                                                                    <:GridapPoissonUpdate})
+    update = cb.affect!
+    update.stages = true
+    return update
 end
 
 # Compute the potential for the initial condition
@@ -241,12 +258,25 @@ function (update::GridapPoissonUpdate)(integrator)
     return nothing
 end
 
+# Called as `stage_limiter!` by the time integration method on each stage value, before the
+# right-hand side is evaluated, and on the solution at the end of each step
+function (update::GridapPoissonUpdate)(u_ode, integrator, semi, t)
+    @trixi_timeit timer() "Gridap Poisson (stages)" begin
+        update_gridap_poisson!(u_ode, semi, update)
+    end
+    return nothing
+end
+
+function mesh_changed(data, mesh)
+    return data === nothing || data.revision != mesh.p4est.revision[] ||
+           data.n_elements != ncells(mesh)
+end
+
 # Solve -Δφ = f with f from `update.source` and write the result with `update.write`
 function update_gridap_poisson!(u_ode, semi, update::GridapPoissonUpdate)
     mesh, _, _, _ = mesh_equations_solver_cache(semi)
     data = update.mesh_data
-    if data === nothing || data.revision != mesh.p4est.revision[] ||
-       data.n_elements != ncells(mesh)
+    if mesh_changed(data, mesh)
         @trixi_timeit timer() "setup" begin
             data = gridap_poisson_mesh_data(mesh, update.dirichlet_tags)
         end
@@ -288,7 +318,11 @@ end
 
 function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:GridapPoissonUpdate})
     update = cb.affect!
-    print(io, "GridapPoissonCallback(interval=", update.interval, ")")
+    if update.stages
+        print(io, "GridapPoissonCallback(stages)")
+    else
+        print(io, "GridapPoissonCallback(interval=", update.interval, ")")
+    end
     return nothing
 end
 
@@ -298,7 +332,9 @@ function Base.show(io::IO, ::MIME"text/plain",
         show(io, cb)
     else
         update = cb.affect!
-        setup = ["interval" => update.interval,
+        setup = [
+            "update" => update.stages ? "each Runge-Kutta stage" :
+                        "every $(update.interval) time steps",
             "Dirichlet tags" => join(update.dirichlet_tags, ", "),
             "source" => nameof(typeof(update.source)),
             "write" => nameof(typeof(update.write))]

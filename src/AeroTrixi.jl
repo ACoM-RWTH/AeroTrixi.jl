@@ -74,7 +74,7 @@ export p4est_mesh_from_vertices, p4est_mesh_five_trees
 export P4estLnodesQ2, apply_hanging_constraints!, gridap_model, gridap_q2_space
 export transfer_dg_to_q2!, transfer_q2_to_dg!, Q2NodeData, q2_value, q2_gradient
 export CompressibleEulerPoissonEquations2D, source_terms_electrostatic
-export GridapPoissonCallback
+export GridapPoissonCallback, gridap_poisson_stage_update
 export gridap_q2_function, gridap_node_values
 
 end

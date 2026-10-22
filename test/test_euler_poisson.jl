@@ -130,6 +130,94 @@ end
         u = Trixi.wrap_array(u_final, semi)
         @test maximum(abs, u[5, :, :, :]) > 0
         @test maximum(abs, u[6:7, :, :, :]) > 0
+
+        # Update on each Runge-Kutta stage: the callback only acts at the start and after
+        # mesh changes, with a rebuild each time
+        mesh = p4est_mesh_five_trees(l = 0.4, trees_per_block = 2, polydeg = 2,
+                                     initial_refinement_level = 1)
+        semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_bump,
+                                            shock_capturing_solver(equations);
+                                            boundary_conditions = boundary_condition_do_nothing,
+                                            source_terms = source_terms_electrostatic)
+        ode = semidiscretize(semi, (0.0, 0.05))
+        amr_indicator = IndicatorHennemannGassner(semi, alpha_max = 0.5,
+                                                  alpha_min = 0.001,
+                                                  alpha_smooth = true,
+                                                  variable = density_pressure)
+        amr_controller = ControllerThreeLevel(semi, amr_indicator, base_level = 1,
+                                              med_level = 2, med_threshold = 0.001,
+                                              max_level = 3, max_threshold = 0.01)
+        amr_callback = AMRCallback(semi, amr_controller, interval = 2,
+                                   adapt_initial_condition = true)
+        poisson_callback = GridapPoissonCallback(semi; source,
+                                                 dirichlet_tags = BOX_SIDES)
+        stage_update = gridap_poisson_stage_update(poisson_callback)
+        @test stage_update === poisson_callback.affect!
+        @test occursin("stages", sprint(show, poisson_callback))
+        callbacks = CallbackSet(amr_callback, poisson_callback,
+                                StepsizeCallback(cfl = 0.5))
+        sol = solve(ode,
+                    CarpenterKennedy2N54(; stage_limiter! = stage_update,
+                                         williamson_condition = false);
+                    dt = 1.0, ode_default_options()..., callback = callbacks)
+        @test sol.t[end] ≈ 0.05
+        # Five stage updates per step (four stages and the end of the step), plus one solve
+        # at the start and after each mesh change
+        @test stage_update.n_setups >= 2
+        @test stage_update.n_solves ==
+              5 * sol.stats.naccept + stage_update.n_setups
+        u_final = copy(sol.u[end])
+        u_check = copy(u_final)
+        Trixi.wrap_array(u_check, semi)[5:7, :, :, :] .= 0
+        check = GridapPoissonCallback(semi; source, dirichlet_tags = BOX_SIDES)
+        Base.get_extension(AeroTrixi, :AeroTrixiGridapExt).update_gridap_poisson!(u_check,
+                                                                                  semi,
+                                                                                  check.affect!)
+        @test maximum(abs, u_check - u_final) < 1e-12
+    end
+
+    @testset "Order in time of the coupling" begin
+        # With the force of the field on the flow, the update of φ and E once per step
+        # limits the time integration to first order; the update on each stage keeps the
+        # fourth order of CarpenterKennedy2N54
+        function initial_condition_smooth(x, t,
+                                          equations::CompressibleEulerPoissonEquations2D)
+            rho = 1 + 0.5 * exp(-20 * ((x[1] - 0.1)^2 + x[2]^2))
+            p = 1 + 0.3 * exp(-30 * (x[1]^2 + (x[2] + 0.2)^2))
+            return prim2cons(SVector(rho, 0.2, -0.1, p, 0.0, 0.0, 0.0), equations)
+        end
+        function euler_variables_at_end(dt, stages)
+            equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 5.0)
+            mesh = p4est_mesh_five_trees(l = 0.4, trees_per_block = 2, polydeg = 2,
+                                         initial_refinement_level = 1)
+            solver = DGSEM(polydeg = 2, surface_flux = flux_lax_friedrichs,
+                           volume_integral = VolumeIntegralFluxDifferencing(flux_ranocha))
+            semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition_smooth,
+                                                solver;
+                                                boundary_conditions = boundary_condition_do_nothing,
+                                                source_terms = source_terms_electrostatic)
+            ode = semidiscretize(semi, (0.0, 0.1))
+            poisson_callback = GridapPoissonCallback(semi;
+                                                     source = (u, x, equations) -> SVector(u[1] -
+                                                                                           1),
+                                                     dirichlet_tags = BOX_SIDES)
+            alg = if stages
+                CarpenterKennedy2N54(;
+                                     stage_limiter! = gridap_poisson_stage_update(poisson_callback),
+                                     williamson_condition = false)
+            else
+                CarpenterKennedy2N54(williamson_condition = false)
+            end
+            sol = solve(ode, alg; dt, adaptive = false, save_everystep = false,
+                        callback = CallbackSet(poisson_callback))
+            return Trixi.wrap_array(sol.u[end], semi)[1:4, :, :, :]
+        end
+        reference = euler_variables_at_end(0.1 / 160, true)
+        for (stages, order) in ((false, 1), (true, 4))
+            errors = [maximum(abs, euler_variables_at_end(0.1 / n, stages) - reference)
+                      for n in (10, 20)]
+            @test log2(errors[1] / errors[2])≈order atol=0.2
+        end
     end
 end
 
