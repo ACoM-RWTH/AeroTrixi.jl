@@ -30,7 +30,8 @@ using Trixi: @printf, @sprintf,
              p4est_lnodes_destroy, p4est_quadrant_t, P4EST_CONNECT_FULL,
              P4EST_MAXLEVEL, load_pointerwrapper_tree, unsafe_wrap_sc,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
-             nnodes, nelements, get_node_vars, set_node_vars!
+             nnodes, nelements, get_node_vars, set_node_vars!,
+             DissipationLocalLaxFriedrichs
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
@@ -39,7 +40,7 @@ import Trixi: pretty_form_ascii, pretty_form_utf,
               energy_total, energy_kinetic, energy_internal,
               entropy, entropy_math, entropy_thermodynamic,
               ncomponents, eachcomponent,
-              flux, max_abs_speed, max_abs_speeds,
+              flux, flux_ranocha, max_abs_speed, max_abs_speed_naive, max_abs_speeds,
               boundary_condition_slip_wall, rotate_to_x, rotate_from_x
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
@@ -72,6 +73,8 @@ export flux_oblapenko_etal, flux_oblapenko_etal_taylor
 export p4est_mesh_from_vertices, p4est_mesh_five_trees
 export P4estLnodesQ2, apply_hanging_constraints!, gridap_model, gridap_q2_space
 export transfer_dg_to_q2!, transfer_q2_to_dg!, Q2NodeData, q2_value, q2_gradient
+export CompressibleEulerPoissonEquations2D, source_terms_electrostatic
+export GridapPoissonCallback
 export gridap_q2_function, gridap_node_values
 
 end

@@ -322,4 +322,27 @@ written into a DG solution with [`transfer_q2_to_dg!`](@ref).
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function gridap_node_values end
+"""
+    GridapPoissonCallback(semi; source, dirichlet_tags, write = ..., interval = 1)
+
+Callback that solves the Poisson problem ``-Δφ = f`` with continuous Q2 finite elements
+in Gridap.jl on the current mesh and writes the result into the DG solution (DG with
+`polydeg = 2`). It is called at the start of the simulation and after every `interval`
+time steps; place it after an `AMRCallback` in the `CallbackSet`, so that the potential is
+recomputed after mesh changes.
+
+- `source(u_node, x, equations)` returns `SVector(f)` at each DG node; `f` is transferred
+  to the Q2 nodes with [`transfer_dg_to_q2!`](@ref).
+- `dirichlet_tags`: boundary names with ``φ = 0``.
+- `write(u_node, q, x, equations)` returns the new state at each DG node, see
+  [`transfer_q2_to_dg!`](@ref). The default, for [`CompressibleEulerPoissonEquations2D`](@ref),
+  sets the variables `phi` to ``φ`` and `E1`, `E2` to ``E = -∇φ``.
+
+The node numbering, Gridap model and spaces, and the Cholesky factorization of the matrix
+are kept and only rebuilt when the mesh changes (detected with the `revision` counter of
+`p4est`).
+
+This function requires Gridap.jl to be loaded (`import Gridap`).
+"""
+function GridapPoissonCallback end
 end # @muladd
