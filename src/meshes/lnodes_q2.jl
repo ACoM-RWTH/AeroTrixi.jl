@@ -299,13 +299,14 @@ This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function gridap_q2_space end
 """
-    gridap_q2_function(node_values, q2_space)
+    gridap_q2_function(node_values, q2_space; field = 1)
 
 Create a Gridap.jl `FEFunction` with the values `node_values` at all nodes of the
-`P4estLnodesQ2` used to create `q2_space` with [`gridap_q2_space`](@ref), e.g., DG data
-transferred with [`dg_to_q2!`](@ref). The function lives in the space without
-hanging-node constraints, i.e., the values at hanging nodes are used as given; with
-[`dg_to_q2!`](@ref), they satisfy the constraints.
+`P4estLnodesQ2` used to create `q2_space` with [`gridap_q2_space`](@ref), e.g., data
+transferred with [`transfer_dg_to_q2!`](@ref). `node_values` is a vector or a matrix
+`n_fields × n_nodes`, of which the row `field` is used. The function lives in the space
+without hanging-node constraints, i.e., the values at hanging nodes are used as given;
+with [`transfer_dg_to_q2!`](@ref), they satisfy the constraints.
 
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """
@@ -316,7 +317,7 @@ function gridap_q2_function end
 
 Values of the Gridap.jl function `uh` at all nodes of the `P4estLnodesQ2` used to create
 `q2_space` with [`gridap_q2_space`](@ref), including the hanging nodes. The result can be
-injected into DG nodes with [`q2_to_dg!`](@ref); see also [`q2_gradient_to_dg!`](@ref).
+written into a DG solution with [`transfer_q2_to_dg!`](@ref).
 
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """

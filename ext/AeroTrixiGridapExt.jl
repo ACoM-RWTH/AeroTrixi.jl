@@ -144,7 +144,11 @@ function AeroTrixi.gridap_q2_space(lnodes::P4estLnodesQ2, model;
     return (; space, unconstrained, node_to_dof)
 end
 
-function AeroTrixi.gridap_q2_function(node_values, q2_space)
+function AeroTrixi.gridap_q2_function(node_values::AbstractMatrix, q2_space; field = 1)
+    return AeroTrixi.gridap_q2_function(view(node_values, field, :), q2_space)
+end
+
+function AeroTrixi.gridap_q2_function(node_values::AbstractVector, q2_space)
     @assert length(node_values)==length(q2_space.node_to_dof) "node_values must contain all nodes"
     space = q2_space.unconstrained
     free_values = zeros(eltype(node_values), num_free_dofs(space))
