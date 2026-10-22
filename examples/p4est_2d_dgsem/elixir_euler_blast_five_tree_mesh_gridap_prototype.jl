@@ -33,6 +33,7 @@ using Gridap: Triangulation, Measure, TrialFESpace, AffineFEOperator, FEFunction
 # run the blast wave
 
 trixi_include(joinpath(@__DIR__, "elixir_euler_blast_wave_five_trees_amr.jl"),
+              tspan = (0.0, 0.3),
               basis = LobattoLegendreBasis(2),
               mesh = p4est_mesh_five_trees(l = 0.4, trees_per_block = 2, polydeg = 2,
                                            initial_refinement_level = 1))

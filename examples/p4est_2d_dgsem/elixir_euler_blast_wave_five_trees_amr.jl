@@ -36,10 +36,10 @@ function initial_condition_blast_wave(x, t, equations::CompressibleEulerEquation
     sin_phi, cos_phi = sincos(phi)
 
     # Calculate primitive variables
-    rho = r > 0.5 ? 1.0 : 1.1691
-    v1 = r > 0.5 ? 0.0 : 0.1882 * cos_phi
-    v2 = r > 0.5 ? 0.0 : 0.1882 * sin_phi
-    p = r > 0.5 ? 1.0E-3 : 1.245
+    rho = r > 0.3 ? 1.0 : 1.0
+    v1 = r > 0.3 ? 0.0 : 0.0 * cos_phi
+    v2 = r > 0.3 ? 0.0 : 0.0 * sin_phi
+    p = r > 0.3 ? 1.0 : 2.0
 
     return prim2cons(SVector(rho, v1, v2, p), equations)
 end
@@ -74,7 +74,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 0.4)
+tspan = (0.0, 0.3)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
@@ -96,8 +96,8 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           variable = density_pressure)
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 1,
-                                      med_level = 3, med_threshold = 0.05,
-                                      max_level = 4, max_threshold = 0.2)
+                                      med_level = 3, med_threshold = 0.06,
+                                      max_level = 5, max_threshold = 0.2)
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 5,
                            adapt_initial_condition = true,
