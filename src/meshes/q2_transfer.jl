@@ -108,15 +108,17 @@ discontinuous between elements and only computed when called.
     # Derivatives with respect to the reference coordinates
     dξ = zero(eltype(node_values))
     dη = zero(eltype(node_values))
-    for k in 1:3
+    @inbounds for k in 1:3
         dξ += D[i, k] * node_values[field, element_nodes[k + 3 * (j - 1)]]
         dη += D[j, k] * node_values[field, element_nodes[i + 3 * (k - 1)]]
     end
     # ∂/∂x_d = (Ja^1_d ∂/∂ξ + Ja^2_d ∂/∂η) / J
     Ja = q.contravariant_vectors
-    return q.inverse_jacobian[i, j, element] *
-           SVector(Ja[1, 1, i, j, element] * dξ + Ja[1, 2, i, j, element] * dη,
-                   Ja[2, 1, i, j, element] * dξ + Ja[2, 2, i, j, element] * dη)
+    return @inbounds q.inverse_jacobian[i, j, element] *
+                     SVector(Ja[1, 1, i, j, element] * dξ +
+                             Ja[1, 2, i, j, element] * dη,
+                             Ja[2, 1, i, j, element] * dξ +
+                             Ja[2, 2, i, j, element] * dη)
 end
 
 """

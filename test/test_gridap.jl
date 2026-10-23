@@ -291,6 +291,13 @@ end
         φh = Gridap.solve(AffineFEOperator((u, v) -> ∫(∇(v) ⋅ ∇(u)) * dΩ,
                                            v -> ∫(v * source) * dΩ, U, q.space))
         node_values = gridap_node_values(φh, q)
+        # The node values read from the degrees of freedom (constrained and unconstrained
+        # space) equal the interpolation, which is used for other functions
+        ext = Base.get_extension(AeroTrixi, :AeroTrixiGridapExt)
+        interpolated(uh) = ext.gridap_node_values_interpolated!(similar(node_values), uh, q)
+        @test maximum(abs, node_values - interpolated(φh)) < 1e-12
+        @test gridap_node_values(source, q) == vec(source_nodes)
+        @test maximum(abs, gridap_node_values(2 * φh, q) - 2 * node_values) < 1e-12
         # Positive source and zero boundary values: positive potential, maximal near the
         # center, vanishing on the boundary
         @test minimum(node_values) > -1e-12

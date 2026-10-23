@@ -27,13 +27,13 @@ end
 # two Poisson problems with the same matrix
 struct TwoPoissonProblems end
 
-function AeroTrixi.gridap_setup(::TwoPoissonProblems, q2, model)
-    return gridap_setup(POISSON, q2, model)
+function AeroTrixi.gridap_setup(::TwoPoissonProblems, q2, model, n_sources)
+    return gridap_setup(POISSON, q2, model, 1)
 end
 
-function AeroTrixi.gridap_solve(::TwoPoissonProblems, setup, q2, sources)
-    return (gridap_solve(POISSON, setup, q2, (sources[1],)),
-            gridap_solve(POISSON, setup, q2, (sources[2],)))
+function AeroTrixi.gridap_solve(::TwoPoissonProblems, setup, q2, source_nodes)
+    return (gridap_solve(POISSON, setup, q2, source_nodes[1:1, :]),
+            gridap_solve(POISSON, setup, q2, source_nodes[2:2, :]))
 end
 
 function update_gridap!(u_ode, semi, update)
@@ -215,6 +215,28 @@ end
         update_gridap!(u_two, semi, two.affect!)
         @test size(two.affect!.mesh_data.source_nodes, 1) == 2
         @test maximum(abs, u_two - u_final) < 1e-12
+
+        # The load vector assembled for each solve gives the same result
+        poisson_assembled = GridapLinearProblem(POISSON.bilinear_form, POISSON.linear_form;
+                                                factorize = POISSON.factorize,
+                                                precompute_load = false)
+        u_assembled = copy(u_final)
+        Trixi.wrap_array(u_assembled, semi)[5:7, :, :, :] .= 0
+        update_gridap!(u_assembled, semi,
+                       GridapCallback(semi, poisson_assembled; source,
+                                      write = write_electrostatic,
+                                      dirichlet_tags = BOX_SIDES).affect!)
+        @test maximum(abs, u_assembled - u_final) < 1e-12
+
+        # A linear form that is not affine in the sources needs `precompute_load = false`
+        poisson_nonlinear = GridapLinearProblem(POISSON.bilinear_form,
+                                                (v, sources, dΩ) -> ∫(v * sources[1] *
+                                                                      sources[1]) * dΩ)
+        @test_throws ArgumentError update_gridap!(copy(u_final), semi,
+                                                  GridapCallback(semi, poisson_nonlinear;
+                                                                 source,
+                                                                 write = write_electrostatic,
+                                                                 dirichlet_tags = BOX_SIDES).affect!)
     end
 
     @testset "Order in time of the coupling" begin

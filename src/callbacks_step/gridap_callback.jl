@@ -18,7 +18,7 @@ changes.
   see [`gridap_setup`](@ref) and [`gridap_solve`](@ref) for the interface.
 - `source(u_node, x, equations)` returns an `SVector` of source fields at each DG node,
   which are transferred to the Q2 nodes with [`transfer_dg_to_q2!`](@ref) and passed to the
-  problem as Gridap.jl functions.
+  problem.
 - `write(u_node, q, x, equations)` returns the new state at each DG node, see
   [`transfer_q2_to_dg!`](@ref); `q2_value(q, k)` and `q2_gradient(q, k)` give the
   solution field `k` and its gradient. For [`CompressibleEulerPoissonEquations2D`](@ref),
@@ -59,7 +59,8 @@ This function requires Gridap.jl to be loaded (`import Gridap`).
 function gridap_stage_update end
 
 """
-    GridapLinearProblem(bilinear_form, linear_form; factorize = lu, quadrature_degree = 4)
+    GridapLinearProblem(bilinear_form, linear_form; factorize = lu, quadrature_degree = 4,
+                        precompute_load = true)
 
 Linear finite element problem `a(u, v) = l(v)` for all test functions `v`, with
 homogeneous Dirichlet conditions on the `dirichlet_tags` of the [`GridapCallback`](@ref).
@@ -70,41 +71,52 @@ The forms are functions
 
 where `dΩ` is the Gridap.jl measure of the mesh with `quadrature_degree`. The matrix is
 assembled and factorized with `factorize` (e.g., `A -> cholesky(Symmetric(A))` for a
-symmetric positive definite matrix) after each mesh change; each solve only assembles the
-right-hand side.
+symmetric positive definite matrix) after each mesh change.
+
+With `precompute_load = true`, the linear form must be affine in the sources (as in the
+example). Then the load vector is `b0 + Σ_k B_k f_k` with the values `f_k` of the source
+field `k` at all Q2 nodes; the vector `b0` and the matrices `B_k` are assembled after each
+mesh change (and checked against a direct assembly with random sources), and each solve only
+needs sparse matrix-vector products and the solve with the factorization. With
+`precompute_load = false`, the load vector is assembled for each solve.
 """
 struct GridapLinearProblem{BilinearForm, LinearForm, Factorize}
     bilinear_form     :: BilinearForm
     linear_form       :: LinearForm
     factorize         :: Factorize
     quadrature_degree :: Int
+    precompute_load   :: Bool
 end
 
 function GridapLinearProblem(bilinear_form, linear_form; factorize = lu,
-                             quadrature_degree = 4)
+                             quadrature_degree = 4, precompute_load = true)
     return GridapLinearProblem(bilinear_form, linear_form, factorize,
-                               Int(quadrature_degree))
+                               Int(quadrature_degree), precompute_load)
 end
 
 """
-    gridap_setup(problem, q2, model)
+    gridap_setup(problem, q2, model, n_sources)
 
 Interface of the problems of a [`GridapCallback`](@ref): set up the mesh-dependent data of
 `problem` (e.g., assemble and factorize a matrix) for the Q2 space `q2` created by
-[`gridap_q2_space`](@ref) on the Gridap.jl `model`. Called at the start and after each
-mesh change; the result is passed to [`gridap_solve`](@ref).
+[`gridap_q2_space`](@ref) on the Gridap.jl `model`, with `n_sources` source fields.
+Called at the start and after each mesh change; the result is passed to
+[`gridap_solve`](@ref).
 
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function gridap_setup end
 
 """
-    gridap_solve(problem, setup, q2, sources)
+    gridap_solve(problem, setup, q2, source_nodes)
 
 Interface of the problems of a [`GridapCallback`](@ref): solve `problem` with the data
-`setup` from [`gridap_setup`](@ref) for the source fields `sources` (a tuple of Gridap.jl
-functions in the Q2 space `q2`). Return the solution as a Gridap.jl function, or a tuple
-of functions for several solution fields.
+`setup` from [`gridap_setup`](@ref) for the source fields given by their values at the
+nodes of the Q2 space `q2`, `source_nodes[k, node]` for the field `k` (with
+[`gridap_q2_function`](@ref), they become Gridap.jl functions). Return the solution as a
+Gridap.jl function, or a tuple of functions for several solution fields; functions of the
+Q2 space are converted to node values directly from their degrees of freedom (see
+[`gridap_node_values`](@ref)).
 
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """

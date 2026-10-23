@@ -3,6 +3,7 @@ module AeroTrixiGridapExt
 using AeroTrixi: AeroTrixi, P4estLnodesQ2, GridapLinearProblem, gridap_setup,
                  gridap_solve, transfer_dg_to_q2!, transfer_q2_to_dg!,
                  gridap_model, gridap_q2_space, gridap_q2_function, gridap_node_values,
+                 apply_hanging_constraints!,
                  DiscreteCallback, isfinished, derivative_discontinuity!,
                  mesh_equations_solver_cache, @trixi_timeit, timer, ncells, summary_box,
                  @unpack, wrap_array, get_node_vars, get_node_coords
@@ -10,6 +11,7 @@ using Gridap: Gridap
 using Gridap.CellData: Measure
 using Gridap.FESpaces: TrialFESpace, assemble_matrix, assemble_vector
 using StaticArrays: SVector
+using LinearAlgebra: mul!, norm
 using Gridap.Arrays: Table, Fill
 using Gridap.Fields: Point
 using Gridap.ReferenceFEs: QUAD, LagrangianRefFE
@@ -20,7 +22,7 @@ using Gridap.FESpaces: FESpaceWithLinearConstraints, UnconstrainedFESpace, CellF
                        H1Conformity, compute_cell_space, FEFunction,
                        interpolate_everywhere, get_free_dof_values,
                        get_dirichlet_dof_values,
-                       num_free_dofs, num_dirichlet_dofs
+                       num_free_dofs, num_dirichlet_dofs, SingleFieldFEFunction
 
 # Node slots (one-based, lexicographic as in Trixi.jl) of the local nodes of a Gridap Q2
 # quadrilateral: four vertices, the midpoints of the edges (bottom, top, left, right), and
@@ -138,18 +140,23 @@ function AeroTrixi.gridap_q2_space(lnodes::P4estLnodesQ2, model;
                                          length(tags))
 
     if n_hanging == 0
-        return (; space = unconstrained, unconstrained, node_to_dof)
+        return (; space = unconstrained, unconstrained, node_to_dof, lnodes)
     end
 
     hanging_masters, hanging_coefficients = lnodes.hanging_masters,
                                             lnodes.hanging_coefficients
     slave_dofs = node_to_dof[(n_independent + 1):n]
+    # The hanging nodes are the last free degrees of freedom. Since the constrained space
+    # numbers its free degrees of freedom by keeping the order of the remaining ones, the
+    # free degree of freedom `dof` of an independent node is the same in both spaces, which
+    # `gridap_node_values` uses.
+    @assert slave_dofs == (n_free - n_hanging + 1):n_free
     master_dofs = Table(vec(node_to_dof[hanging_masters]), 1:3:(3 * n_hanging + 1))
     coefficients = Table(vec(hanging_coefficients), 1:3:(3 * n_hanging + 1))
     space = FESpaceWithLinearConstraints(slave_dofs, master_dofs, coefficients,
                                          unconstrained)
 
-    return (; space, unconstrained, node_to_dof)
+    return (; space, unconstrained, node_to_dof, lnodes)
 end
 
 function AeroTrixi.gridap_q2_function(node_values::AbstractMatrix, q2_space; field = 1)
@@ -172,14 +179,60 @@ function AeroTrixi.gridap_q2_function(node_values::AbstractVector, q2_space)
 end
 
 function AeroTrixi.gridap_node_values(uh, q2_space)
+    return gridap_node_values!(Vector{Float64}(undef, length(q2_space.node_to_dof)), uh,
+                               q2_space)
+end
+
+# A function of the Q2 space (with or without constraints) is read from its degrees of
+# freedom; the values at hanging nodes of the constrained space follow from the
+# constraints. Other functions are interpolated.
+function gridap_node_values!(values, uh::SingleFieldFEFunction, q2_space)
+    free_values = get_free_dof_values(uh)
+    dirichlet_values = get_dirichlet_dof_values(uh)
+    n_dirichlet = num_dirichlet_dofs(q2_space.unconstrained)
+    if length(dirichlet_values) != n_dirichlet
+        return gridap_node_values_interpolated!(values, uh, q2_space)
+    end
+    if length(free_values) == num_free_dofs(q2_space.unconstrained)
+        n_read = length(q2_space.node_to_dof)
+    elseif length(free_values) == num_free_dofs(q2_space.space)
+        n_read = q2_space.lnodes.n_independent
+    else
+        return gridap_node_values_interpolated!(values, uh, q2_space)
+    end
+    # Function barrier: the vectors are stored with abstract types in the `FEFunction`
+    node_values_from_dofs!(values, free_values, dirichlet_values, q2_space.node_to_dof,
+                           n_read)
+    if n_read < length(values)
+        apply_hanging_constraints!(values, q2_space.lnodes)
+    end
+    return values
+end
+
+function node_values_from_dofs!(values, free_values, dirichlet_values, node_to_dof, n_read)
+    @inbounds for node in 1:n_read
+        dof = node_to_dof[node]
+        values[node] = dof > 0 ? free_values[dof] : dirichlet_values[-dof]
+    end
+    return values
+end
+
+function gridap_node_values!(values, uh, q2_space)
+    gridap_node_values_interpolated!(values, uh,
+                                     q2_space)
+end
+
+function gridap_node_values_interpolated!(values, uh, q2_space)
     # Interpolation onto the space without constraints evaluates the function at all
     # nodes, including the hanging nodes. `interpolate_everywhere` also sets the values of
     # the Dirichlet nodes, which `interpolate` would set to zero.
     u_nodes = interpolate_everywhere(uh, q2_space.unconstrained)
     free_values = get_free_dof_values(u_nodes)
     dirichlet_values = get_dirichlet_dof_values(u_nodes)
-    return [dof > 0 ? free_values[dof] : dirichlet_values[-dof]
-            for dof in q2_space.node_to_dof]
+    for (node, dof) in enumerate(q2_space.node_to_dof)
+        values[node] = dof > 0 ? free_values[dof] : dirichlet_values[-dof]
+    end
+    return values
 end
 
 ###############################################################################
@@ -281,11 +334,9 @@ function update_gridap!(u_ode, semi, update::GridapCallbackUpdate)
 
     @trixi_timeit timer() "DG → Q2" begin
         transfer_dg_to_q2!(update.source, source_nodes, u_ode, semi, lnodes)
-        sources = ntuple(field -> gridap_q2_function(source_nodes, q2; field),
-                         size(source_nodes, 1))
     end
     @trixi_timeit timer() "solve" begin
-        solution = gridap_solve(update.problem, setup, q2, sources)
+        solution = gridap_solve(update.problem, setup, q2, source_nodes)
     end
     @trixi_timeit timer() "Q2 → DG" begin
         if solution isa Tuple
@@ -309,19 +360,21 @@ function gridap_mesh_data(u_ode, semi, update)
     @trixi_timeit timer() "space" begin
         q2 = gridap_q2_space(lnodes, model; dirichlet_tags = update.dirichlet_tags)
     end
-    @trixi_timeit timer() "problem" setup=gridap_setup(update.problem, q2, model)
     # Number of source fields from the source at the first DG node
     u = wrap_array(u_ode, semi)
     u_node = get_node_vars(u, equations, solver, 1, 1, 1)
     x_node = get_node_coords(cache.elements.node_coordinates, equations, solver, 1, 1, 1)
     n_sources = length(update.source(u_node, x_node, equations))
+    @trixi_timeit timer() "problem" begin
+        setup = gridap_setup(update.problem, q2, model, n_sources)
+    end
     source_nodes = zeros(n_sources, length(q2.node_to_dof))
     return GridapMeshData(Int(mesh.p4est.revision[]), ncells(mesh), lnodes, q2, setup,
                           source_nodes)
 end
 
 # Linear problems: assemble and factorize the matrix once per mesh
-function AeroTrixi.gridap_setup(problem::GridapLinearProblem, q2, model)
+function AeroTrixi.gridap_setup(problem::GridapLinearProblem, q2, model, n_sources)
     # Homogeneous Dirichlet conditions
     trial_space = TrialFESpace(q2.space, 0.0)
     dΩ = Measure(Triangulation(model), problem.quadrature_degree)
@@ -330,12 +383,70 @@ function AeroTrixi.gridap_setup(problem::GridapLinearProblem, q2, model)
                             q2.space)
     end
     @trixi_timeit timer() "factorize" factorization=problem.factorize(A)
-    return (; trial_space, dΩ, factorization)
+    load = nothing
+    if problem.precompute_load
+        @trixi_timeit timer() "load matrices" begin
+            load = load_matrices(problem, q2, model, dΩ, n_sources)
+        end
+    end
+    return (; trial_space, dΩ, factorization, load)
 end
 
-function AeroTrixi.gridap_solve(problem::GridapLinearProblem, setup, q2, sources)
-    @unpack trial_space, dΩ, factorization = setup
-    b = assemble_vector(v -> problem.linear_form(v, sources, dΩ), q2.space)
+# For a linear form that is affine in the sources, the load vector is
+# `b0 + Σ_k B_k f_k` with the source values `f_k` at all nodes
+function load_matrices(problem, q2, model, dΩ, n_sources)
+    # Space with all nodes as free degrees of freedom, in the order of the nodes
+    source_space = gridap_q2_space(q2.lnodes, model).unconstrained
+    zero_source = zero(source_space)
+    zero_sources = ntuple(_ -> zero_source, n_sources)
+    message = "the linear form is not affine in the sources; use " *
+              "`GridapLinearProblem(...; precompute_load = false)`"
+    b0, B = try
+        b0 = assemble_vector(v -> problem.linear_form(v, zero_sources, dΩ), q2.space)
+        B = map(1:n_sources) do k
+            assemble_matrix((f, v) -> problem.linear_form(v,
+                                                          ntuple(j -> j == k ? f :
+                                                                      zero_source,
+                                                                 n_sources), dΩ),
+                            source_space, q2.space)
+        end
+        b0, B
+    catch err
+        # E.g., a product of sources is a product of trial functions here, which Gridap.jl
+        # rejects
+        throw(ArgumentError(message * " (assembly failed with " *
+                            sprint(showerror, err) * ")"))
+    end
+    b = similar(b0)
+
+    # Check with random sources that the linear form is affine in the sources
+    source_nodes = rand(n_sources, length(q2.node_to_dof))
+    sources = ntuple(k -> gridap_q2_function(source_nodes, q2; field = k), n_sources)
+    b_assembled = assemble_vector(v -> problem.linear_form(v, sources, dΩ), q2.space)
+    load_vector!(b, (; b0, B), source_nodes)
+    if norm(b - b_assembled) > 1e-10 * (1 + norm(b_assembled))
+        throw(ArgumentError(message))
+    end
+    return (; b0, B, b)
+end
+
+function load_vector!(b, load, source_nodes)
+    copyto!(b, load.b0)
+    for k in eachindex(load.B)
+        mul!(b, load.B[k], view(source_nodes, k, :), true, true)
+    end
+    return b
+end
+
+function AeroTrixi.gridap_solve(problem::GridapLinearProblem, setup, q2, source_nodes)
+    @unpack trial_space, dΩ, factorization, load = setup
+    if load === nothing
+        sources = ntuple(k -> gridap_q2_function(source_nodes, q2; field = k),
+                         size(source_nodes, 1))
+        b = assemble_vector(v -> problem.linear_form(v, sources, dΩ), q2.space)
+    else
+        b = load_vector!(load.b, load, source_nodes)
+    end
     return FEFunction(trial_space, factorization \ b)
 end
 
