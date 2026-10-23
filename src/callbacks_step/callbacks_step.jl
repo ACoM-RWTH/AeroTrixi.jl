@@ -6,4 +6,5 @@
 #! format: noindent
 
 include("surface_pointwise_callback.jl")
+include("gridap_callback.jl")
 end # @muladd

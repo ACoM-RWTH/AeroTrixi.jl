@@ -4,11 +4,44 @@ using Test
 using Trixi
 using AeroTrixi
 import Gridap
+using Gridap: ∫, ∇, ⋅
+using LinearAlgebra: cholesky, Symmetric
 using OrdinaryDiffEqLowStorageRK
 
 include("mesh_test_utils.jl")
 
 const BOX_SIDES = (:x_neg, :x_pos, :y_neg, :y_pos)
+
+# -Δφ = f with homogeneous Dirichlet conditions
+const POISSON = GridapLinearProblem((φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
+                                    (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
+                                    factorize = A -> cholesky(Symmetric(A)))
+
+function poisson_callback(semi, source)
+    GridapCallback(semi, POISSON; source,
+                   write = write_electrostatic,
+                   dirichlet_tags = BOX_SIDES)
+end
+
+# A problem with two sources and two solutions, using the interface of `GridapCallback`:
+# two Poisson problems with the same matrix
+struct TwoPoissonProblems end
+
+function AeroTrixi.gridap_setup(::TwoPoissonProblems, q2, model)
+    return gridap_setup(POISSON, q2, model)
+end
+
+function AeroTrixi.gridap_solve(::TwoPoissonProblems, setup, q2, sources)
+    return (gridap_solve(POISSON, setup, q2, (sources[1],)),
+            gridap_solve(POISSON, setup, q2, (sources[2],)))
+end
+
+function update_gridap!(u_ode, semi, update)
+    Base.get_extension(AeroTrixi,
+                       :AeroTrixiGridapExt).update_gridap!(u_ode,
+                                                           semi,
+                                                           update)
+end
 
 function initial_condition_bump(x, t, equations::CompressibleEulerPoissonEquations2D)
     rho = 1 + 0.5 * exp(-20 * ((x[1] - 0.1)^2 + x[2]^2))
@@ -79,7 +112,7 @@ end
                   source_terms_electrostatic(u, SVector(0.0, 0.0), 0.0, equations))
     end
 
-    @testset "GridapPoissonCallback with AMR" begin
+    @testset "GridapCallback with AMR" begin
         equations = CompressibleEulerPoissonEquations2D(1.4)
         mesh = p4est_mesh_five_trees(l = 0.4, trees_per_block = 2, polydeg = 2,
                                      initial_refinement_level = 1)
@@ -98,31 +131,27 @@ end
         amr_callback = AMRCallback(semi, amr_controller, interval = 2,
                                    adapt_initial_condition = true)
         source = (u, x, equations) -> SVector(u[1] - 1)
-        poisson_callback = GridapPoissonCallback(semi; source,
-                                                 dirichlet_tags = BOX_SIDES)
-        callbacks = CallbackSet(amr_callback, poisson_callback,
+        gridap_callback = poisson_callback(semi, source)
+        callbacks = CallbackSet(amr_callback, gridap_callback,
                                 StepsizeCallback(cfl = 0.5))
         sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false); dt = 1.0,
                     ode_default_options()..., callback = callbacks)
         @test sol.t[end] ≈ 0.05
-        update = poisson_callback.affect!
+        update = gridap_callback.affect!
         n_steps = sol.stats.naccept
         # One solve at the start and one after each step; rebuilds after mesh changes
         @test update.n_solves == n_steps + 1
         @test update.n_setups >= 2
         @test Trixi.ncells(mesh) > 80
-        @test occursin("GridapPoissonCallback", sprint(show, poisson_callback))
-        @test occursin("GridapPoissonCallback",
-                       sprint(show, MIME"text/plain"(), poisson_callback))
+        @test occursin("GridapCallback", sprint(show, gridap_callback))
+        @test occursin("GridapLinearProblem",
+                       sprint(show, MIME"text/plain"(), gridap_callback))
 
         # φ and E of the final state equal a separate solve on the final mesh
         u_final = copy(sol.u[end])
         u_check = copy(u_final)
         Trixi.wrap_array(u_check, semi)[5:7, :, :, :] .= 0
-        check = GridapPoissonCallback(semi; source, dirichlet_tags = BOX_SIDES)
-        Base.get_extension(AeroTrixi, :AeroTrixiGridapExt).update_gridap_poisson!(u_check,
-                                                                                  semi,
-                                                                                  check.affect!)
+        update_gridap!(u_check, semi, poisson_callback(semi, source).affect!)
         @test maximum(abs, u_check - u_final) < 1e-12
 
         # The potential is zero on the boundary and E = -∇φ is consistent with φ:
@@ -149,12 +178,11 @@ end
                                               max_level = 3, max_threshold = 0.01)
         amr_callback = AMRCallback(semi, amr_controller, interval = 2,
                                    adapt_initial_condition = true)
-        poisson_callback = GridapPoissonCallback(semi; source,
-                                                 dirichlet_tags = BOX_SIDES)
-        stage_update = gridap_poisson_stage_update(poisson_callback)
-        @test stage_update === poisson_callback.affect!
-        @test occursin("stages", sprint(show, poisson_callback))
-        callbacks = CallbackSet(amr_callback, poisson_callback,
+        gridap_callback = poisson_callback(semi, source)
+        stage_update = gridap_stage_update(gridap_callback)
+        @test stage_update === gridap_callback.affect!
+        @test occursin("stages", sprint(show, gridap_callback))
+        callbacks = CallbackSet(amr_callback, gridap_callback,
                                 StepsizeCallback(cfl = 0.5))
         sol = solve(ode,
                     CarpenterKennedy2N54(; stage_limiter! = stage_update,
@@ -169,11 +197,24 @@ end
         u_final = copy(sol.u[end])
         u_check = copy(u_final)
         Trixi.wrap_array(u_check, semi)[5:7, :, :, :] .= 0
-        check = GridapPoissonCallback(semi; source, dirichlet_tags = BOX_SIDES)
-        Base.get_extension(AeroTrixi, :AeroTrixiGridapExt).update_gridap_poisson!(u_check,
-                                                                                  semi,
-                                                                                  check.affect!)
+        update_gridap!(u_check, semi, poisson_callback(semi, source).affect!)
         @test maximum(abs, u_check - u_final) < 1e-12
+
+        # Several source and solution fields: two Poisson problems with the sources ρ - 1
+        # and 2 (ρ - 1); the solutions are φ and 2 φ
+        u_two = copy(u_final)
+        Trixi.wrap_array(u_two, semi)[5:7, :, :, :] .= 0
+        write_two = function (u, q, x, equations)
+            ∇φ = q2_gradient(q, 1)
+            return SVector(u[1], u[2], u[3], u[4], q2_value(q, 2) / 2, -∇φ[1], -∇φ[2])
+        end
+        two = GridapCallback(semi, TwoPoissonProblems();
+                             source = (u, x, equations) -> SVector(u[1] - 1,
+                                                                   2 * (u[1] - 1)),
+                             write = write_two, dirichlet_tags = BOX_SIDES)
+        update_gridap!(u_two, semi, two.affect!)
+        @test size(two.affect!.mesh_data.source_nodes, 1) == 2
+        @test maximum(abs, u_two - u_final) < 1e-12
     end
 
     @testset "Order in time of the coupling" begin
@@ -197,19 +238,16 @@ end
                                                 boundary_conditions = boundary_condition_do_nothing,
                                                 source_terms = source_terms_electrostatic)
             ode = semidiscretize(semi, (0.0, 0.1))
-            poisson_callback = GridapPoissonCallback(semi;
-                                                     source = (u, x, equations) -> SVector(u[1] -
-                                                                                           1),
-                                                     dirichlet_tags = BOX_SIDES)
+            gridap_callback = poisson_callback(semi, (u, x, equations) -> SVector(u[1] - 1))
             alg = if stages
                 CarpenterKennedy2N54(;
-                                     stage_limiter! = gridap_poisson_stage_update(poisson_callback),
+                                     stage_limiter! = gridap_stage_update(gridap_callback),
                                      williamson_condition = false)
             else
                 CarpenterKennedy2N54(williamson_condition = false)
             end
             sol = solve(ode, alg; dt, adaptive = false, save_everystep = false,
-                        callback = CallbackSet(poisson_callback))
+                        callback = CallbackSet(gridap_callback))
             return Trixi.wrap_array(sol.u[end], semi)[1:4, :, :, :]
         end
         reference = euler_variables_at_end(0.1 / 160, true)

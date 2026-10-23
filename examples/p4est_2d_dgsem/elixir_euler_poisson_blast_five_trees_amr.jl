@@ -3,9 +3,12 @@ using Trixi
 using AeroTrixi
 using Plots
 
-# Gridap.jl is loaded without bringing its names into scope (`solve` would clash with the
-# time integration); this also loads the Gridap.jl extension of AeroTrixi.jl.
+# Gridap.jl is loaded without bringing all its names into scope (`solve` would clash with
+# the time integration); this also loads the Gridap.jl extension of AeroTrixi.jl. Only the
+# names for the weak form are imported.
 import Gridap
+using Gridap: ∫, ∇, ⋅
+using LinearAlgebra: cholesky, Symmetric
 
 ###############################################################################
 # Euler equations with an electrostatic potential φ and field E = -∇φ.
@@ -19,7 +22,8 @@ import Gridap
 # `coupling = 0`: the potential follows the density, but does not act on the flow yet.
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
-# OrdinaryDiffEqLowStorageRK.jl, Plots.jl, and Gridap.jl in the active environment.
+# OrdinaryDiffEqLowStorageRK.jl, Plots.jl, Gridap.jl, and LinearAlgebra in the active
+# environment.
 
 equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 0.0)
 
@@ -102,16 +106,21 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
-# Poisson problem -Δφ = ρ - ρ0 with φ = 0 on all sides of the box. The default `write` sets
-# the variables φ, E1, E2 of the DG solution.
-poisson_callback = GridapPoissonCallback(semi;
-                                         source = (u, x, equations) -> SVector(u[1] -
-                                                                               RHO_0),
-                                         dirichlet_tags = (:x_neg, :x_pos, :y_neg,
-                                                           :y_pos))
+# Poisson problem -Δφ = ρ - ρ0 with φ = 0 on all sides of the box, in weak form
+# ∫ ∇v ⋅ ∇φ = ∫ v (ρ - ρ0). The matrix is symmetric positive definite, also with the
+# hanging-node constraints.
+poisson_problem = GridapLinearProblem((φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
+                                      (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
+                                      factorize = A -> cholesky(Symmetric(A)))
+# The source ρ - ρ0 is transferred from the DG solution; `write_electrostatic` sets the
+# variables φ, E1, E2 of the DG solution
+poisson_callback = GridapCallback(semi, poisson_problem;
+                                  source = (u, x, equations) -> SVector(u[1] - RHO_0),
+                                  write = write_electrostatic,
+                                  dirichlet_tags = (:x_neg, :x_pos, :y_neg, :y_pos))
 # Solve the Poisson problem on each Runge-Kutta stage, called by the time integration method
 # as `stage_limiter!`; the callback then only acts after mesh changes
-poisson_stage_update = gridap_poisson_stage_update(poisson_callback)
+poisson_stage_update = gridap_stage_update(poisson_callback)
 
 stepsize_callback = StepsizeCallback(cfl = 0.9)
 

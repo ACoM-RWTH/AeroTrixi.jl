@@ -15,8 +15,9 @@ and the electric field ``E = -\nabla \phi``. The variables are
 The Euler part is the one of `CompressibleEulerEquations2D(gamma)`. The potential and the
 field have no flux and no numerical dissipation, so that they are not changed by the time
 integration of the DG discretization. They are set by a callback that solves the Poisson
-problem for ``\phi`` (see `GridapPoissonCallback`) and act on the flow through the source
-terms [`source_terms_electrostatic`](@ref), scaled by `coupling`.
+problem for ``\phi`` (see [`GridapCallback`](@ref) and [`write_electrostatic`](@ref)) and
+act on the flow through the source terms [`source_terms_electrostatic`](@ref), scaled by
+`coupling`.
 """
 struct CompressibleEulerPoissonEquations2D{RealT <: Real,
                                            Euler <: CompressibleEulerEquations2D} <:
@@ -141,5 +142,18 @@ The potential and the field have no source terms; they are set by a callback.
     z = zero(eltype(u))
     return SVector(z, c * rho * E1, c * rho * E2, c * (rho_v1 * E1 + rho_v2 * E2), z,
                    z, z)
+end
+
+@doc raw"""
+    write_electrostatic(u, q, x, equations::CompressibleEulerPoissonEquations2D)
+
+Write function of a [`GridapCallback`](@ref) solving for the potential ``\phi``: keep
+the Euler variables of the state `u` and set the potential to ``\phi`` and the field to
+``E = -\nabla \phi``, from the first solution field at the node `q`.
+"""
+@inline function write_electrostatic(u, q, x,
+                                     equations::CompressibleEulerPoissonEquations2D)
+    ∇φ = q2_gradient(q)
+    return with_electrostatic(euler_variables(u), SVector(q2_value(q), -∇φ[1], -∇φ[2]))
 end
 end # @muladd

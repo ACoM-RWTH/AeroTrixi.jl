@@ -1,15 +1,14 @@
 module AeroTrixiGridapExt
 
-using AeroTrixi: AeroTrixi, P4estLnodesQ2, CompressibleEulerPoissonEquations2D,
-                 transfer_dg_to_q2!, transfer_q2_to_dg!, q2_value, q2_gradient,
+using AeroTrixi: AeroTrixi, P4estLnodesQ2, GridapLinearProblem, gridap_setup,
+                 gridap_solve, transfer_dg_to_q2!, transfer_q2_to_dg!,
                  gridap_model, gridap_q2_space, gridap_q2_function, gridap_node_values,
                  DiscreteCallback, isfinished, derivative_discontinuity!,
                  mesh_equations_solver_cache, @trixi_timeit, timer, ncells, summary_box,
-                 @unpack
-using Gridap: Gridap, ∫, ∇, ⋅
+                 @unpack, wrap_array, get_node_vars, get_node_coords
+using Gridap: Gridap
 using Gridap.CellData: Measure
 using Gridap.FESpaces: TrialFESpace, assemble_matrix, assemble_vector
-using LinearAlgebra: cholesky, Symmetric
 using StaticArrays: SVector
 using Gridap.Arrays: Table, Fill
 using Gridap.Fields: Point
@@ -184,47 +183,41 @@ function AeroTrixi.gridap_node_values(uh, q2_space)
 end
 
 ###############################################################################
-# Callback solving a Poisson problem with Gridap.jl and writing the result into the
+# Callback solving a finite element problem with Gridap.jl and writing the result into the
 # DG solution
 
 # Mesh-dependent data, rebuilt when the mesh changes
-struct GridapPoissonMeshData{Lnodes, Q2, U, Measure, Factorization}
-    revision      :: Int
-    n_elements    :: Int
-    lnodes        :: Lnodes
-    q2            :: Q2
-    trial_space   :: U
-    dΩ            :: Measure
-    factorization :: Factorization
-    source_nodes  :: Matrix{Float64}
+struct GridapMeshData{Lnodes, Q2, Setup}
+    revision     :: Int
+    n_elements   :: Int
+    lnodes       :: Lnodes
+    q2           :: Q2
+    setup        :: Setup
+    source_nodes :: Matrix{Float64}
 end
 
-mutable struct GridapPoissonUpdate{Source, Write, Tags}
+mutable struct GridapCallbackUpdate{Problem, Source, Write, Tags}
+    const problem        :: Problem
     const source         :: Source
     const write          :: Write
     const dirichlet_tags :: Tags
     const interval       :: Int
     mesh_data            :: Any
-    # Set by `gridap_poisson_stage_update`: the Poisson problem is solved on each Runge-Kutta
-    # stage, and the callback only acts after mesh changes
+    # Set by `gridap_stage_update`: the problem is solved on each Runge-Kutta stage, and the
+    # callback only acts after mesh changes
     stages   :: Bool
     n_setups :: Int
     n_solves :: Int
 end
 
-# By default, the potential and the field E = -∇φ are written into the variables φ, E1, E2
-function default_poisson_write(u, q, x, equations::CompressibleEulerPoissonEquations2D)
-    ∇φ = q2_gradient(q)
-    return SVector(u[1], u[2], u[3], u[4], q2_value(q), -∇φ[1], -∇φ[2])
-end
-
-function AeroTrixi.GridapPoissonCallback(semi; source, dirichlet_tags,
-                                         write = default_poisson_write, interval = 1)
-    update = GridapPoissonUpdate(source, write, Tuple(Symbol.(dirichlet_tags)),
-                                 Int(interval), nothing, false, 0, 0)
+function AeroTrixi.GridapCallback(semi, problem; source, write, dirichlet_tags = (),
+                                  interval = 1)
+    update = GridapCallbackUpdate(problem, source, write, Tuple(Symbol.(dirichlet_tags)),
+                                  Int(interval), nothing, false, 0, 0)
     condition = function (u, t, integrator)
         if update.stages
-            # The stage updates keep φ and E up to date as long as the mesh is not changed
+            # The stage updates keep the solution up to date as long as the mesh is not
+            # changed
             mesh, _, _, _ = mesh_equations_solver_cache(integrator.p)
             return mesh_changed(update.mesh_data, mesh)
         end
@@ -232,26 +225,26 @@ function AeroTrixi.GridapPoissonCallback(semi; source, dirichlet_tags,
                (integrator.stats.naccept % interval == 0 || isfinished(integrator))
     end
     return DiscreteCallback(condition, update, save_positions = (false, false),
-                            initialize = initialize_gridap_poisson!)
+                            initialize = initialize_gridap_callback!)
 end
 
-function AeroTrixi.gridap_poisson_stage_update(cb::DiscreteCallback{<:Any,
-                                                                    <:GridapPoissonUpdate})
+function AeroTrixi.gridap_stage_update(cb::DiscreteCallback{<:Any,
+                                                            <:GridapCallbackUpdate})
     update = cb.affect!
     update.stages = true
     return update
 end
 
-# Compute the potential for the initial condition
-function initialize_gridap_poisson!(cb, u, t, integrator)
+# Compute the solution for the initial condition
+function initialize_gridap_callback!(cb, u, t, integrator)
     cb.affect!(integrator)
     return nothing
 end
 
-function (update::GridapPoissonUpdate)(integrator)
+function (update::GridapCallbackUpdate)(integrator)
     semi = integrator.p
-    @trixi_timeit timer() "Gridap Poisson" begin
-        update_gridap_poisson!(integrator.u, semi, update)
+    @trixi_timeit timer() "Gridap" begin
+        update_gridap!(integrator.u, semi, update)
     end
     # The solution vector has been modified
     derivative_discontinuity!(integrator, true)
@@ -260,9 +253,9 @@ end
 
 # Called as `stage_limiter!` by the time integration method on each stage value, before the
 # right-hand side is evaluated, and on the solution at the end of each step
-function (update::GridapPoissonUpdate)(u_ode, integrator, semi, t)
-    @trixi_timeit timer() "Gridap Poisson (stages)" begin
-        update_gridap_poisson!(u_ode, semi, update)
+function (update::GridapCallbackUpdate)(u_ode, integrator, semi, t)
+    @trixi_timeit timer() "Gridap (stages)" begin
+        update_gridap!(u_ode, semi, update)
     end
     return nothing
 end
@@ -272,62 +265,92 @@ function mesh_changed(data, mesh)
            data.n_elements != ncells(mesh)
 end
 
-# Solve -Δφ = f with f from `update.source` and write the result with `update.write`
-function update_gridap_poisson!(u_ode, semi, update::GridapPoissonUpdate)
-    mesh, _, _, _ = mesh_equations_solver_cache(semi)
+# Solve the problem with the sources from `update.source` and write the result with
+# `update.write`
+function update_gridap!(u_ode, semi, update::GridapCallbackUpdate)
+    mesh, equations, _, _ = mesh_equations_solver_cache(semi)
     data = update.mesh_data
     if mesh_changed(data, mesh)
         @trixi_timeit timer() "setup" begin
-            data = gridap_poisson_mesh_data(mesh, update.dirichlet_tags)
+            data = gridap_mesh_data(u_ode, semi, update)
         end
         update.mesh_data = data
         update.n_setups += 1
     end
-    @unpack lnodes, q2, trial_space, dΩ, factorization, source_nodes = data
+    @unpack lnodes, q2, setup, source_nodes = data
 
     @trixi_timeit timer() "DG → Q2" begin
         transfer_dg_to_q2!(update.source, source_nodes, u_ode, semi, lnodes)
-        f = gridap_q2_function(source_nodes, q2)
+        sources = ntuple(field -> gridap_q2_function(source_nodes, q2; field),
+                         size(source_nodes, 1))
     end
     @trixi_timeit timer() "solve" begin
-        b = assemble_vector(v -> ∫(v * f) * dΩ, q2.space)
-        φh = FEFunction(trial_space, factorization \ b)
+        solution = gridap_solve(update.problem, setup, q2, sources)
     end
     @trixi_timeit timer() "Q2 → DG" begin
-        φ_nodes = gridap_node_values(φh, q2)
-        transfer_q2_to_dg!(update.write, u_ode, semi, lnodes, φ_nodes)
+        if solution isa Tuple
+            # Solution fields as rows
+            solution_nodes = permutedims(reduce(hcat,
+                                                map(uh -> gridap_node_values(uh, q2),
+                                                    solution)))
+        else
+            solution_nodes = gridap_node_values(solution, q2)
+        end
+        transfer_q2_to_dg!(update.write, u_ode, semi, lnodes, solution_nodes)
     end
     update.n_solves += 1
     return nothing
 end
 
-function gridap_poisson_mesh_data(mesh, dirichlet_tags)
-    lnodes = P4estLnodesQ2(mesh)
-    model = gridap_model(lnodes)
-    q2 = gridap_q2_space(lnodes, model; dirichlet_tags)
-    # Homogeneous Dirichlet conditions
-    trial_space = TrialFESpace(q2.space, 0.0)
-    dΩ = Measure(Triangulation(model), 4)
-    A = assemble_matrix((φ, v) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ, trial_space, q2.space)
-    # Symmetric positive definite, also with the hanging-node constraints
-    factorization = cholesky(Symmetric(A))
-    source_nodes = zeros(1, length(q2.node_to_dof))
-    return GridapPoissonMeshData(Int(mesh.p4est.revision[]), ncells(mesh), lnodes, q2,
-                                 trial_space, dΩ, factorization, source_nodes)
+function gridap_mesh_data(u_ode, semi, update)
+    mesh, equations, solver, cache = mesh_equations_solver_cache(semi)
+    @trixi_timeit timer() "lnodes" lnodes=P4estLnodesQ2(mesh)
+    @trixi_timeit timer() "model" model=gridap_model(lnodes)
+    @trixi_timeit timer() "space" begin
+        q2 = gridap_q2_space(lnodes, model; dirichlet_tags = update.dirichlet_tags)
+    end
+    @trixi_timeit timer() "problem" setup=gridap_setup(update.problem, q2, model)
+    # Number of source fields from the source at the first DG node
+    u = wrap_array(u_ode, semi)
+    u_node = get_node_vars(u, equations, solver, 1, 1, 1)
+    x_node = get_node_coords(cache.elements.node_coordinates, equations, solver, 1, 1, 1)
+    n_sources = length(update.source(u_node, x_node, equations))
+    source_nodes = zeros(n_sources, length(q2.node_to_dof))
+    return GridapMeshData(Int(mesh.p4est.revision[]), ncells(mesh), lnodes, q2, setup,
+                          source_nodes)
 end
 
-function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:GridapPoissonUpdate})
+# Linear problems: assemble and factorize the matrix once per mesh
+function AeroTrixi.gridap_setup(problem::GridapLinearProblem, q2, model)
+    # Homogeneous Dirichlet conditions
+    trial_space = TrialFESpace(q2.space, 0.0)
+    dΩ = Measure(Triangulation(model), problem.quadrature_degree)
+    @trixi_timeit timer() "assemble" begin
+        A = assemble_matrix((u, v) -> problem.bilinear_form(u, v, dΩ), trial_space,
+                            q2.space)
+    end
+    @trixi_timeit timer() "factorize" factorization=problem.factorize(A)
+    return (; trial_space, dΩ, factorization)
+end
+
+function AeroTrixi.gridap_solve(problem::GridapLinearProblem, setup, q2, sources)
+    @unpack trial_space, dΩ, factorization = setup
+    b = assemble_vector(v -> problem.linear_form(v, sources, dΩ), q2.space)
+    return FEFunction(trial_space, factorization \ b)
+end
+
+function Base.show(io::IO, cb::DiscreteCallback{<:Any, <:GridapCallbackUpdate})
     update = cb.affect!
     if update.stages
-        print(io, "GridapPoissonCallback(stages)")
+        print(io, "GridapCallback(stages)")
     else
-        print(io, "GridapPoissonCallback(interval=", update.interval, ")")
+        print(io, "GridapCallback(interval=", update.interval, ")")
     end
     return nothing
 end
 
 function Base.show(io::IO, ::MIME"text/plain",
-                   cb::DiscreteCallback{<:Any, <:GridapPoissonUpdate})
+                   cb::DiscreteCallback{<:Any, <:GridapCallbackUpdate})
     if get(io, :compact, false)
         show(io, cb)
     else
@@ -335,10 +358,11 @@ function Base.show(io::IO, ::MIME"text/plain",
         setup = [
             "update" => update.stages ? "each Runge-Kutta stage" :
                         "every $(update.interval) time steps",
+            "problem" => nameof(typeof(update.problem)),
             "Dirichlet tags" => join(update.dirichlet_tags, ", "),
             "source" => nameof(typeof(update.source)),
             "write" => nameof(typeof(update.write))]
-        summary_box(io, "GridapPoissonCallback", setup)
+        summary_box(io, "GridapCallback", setup)
     end
     return nothing
 end
