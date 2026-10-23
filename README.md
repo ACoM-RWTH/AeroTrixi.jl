@@ -15,6 +15,7 @@ In the future, we plan to add more features for nonideal and rarefied gases, for
 - **Surface pressure and friction coefficients**: Compute and save pointwise aerodynamic coefficients along boundaries
 - **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
 - **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
+- **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with [Gridap.jl](https://github.com/gridap/Gridap.jl), solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with `polydeg = 2` and Q2 elements), with sources from and results written into the DG solution, once per time step or on each Runge-Kutta stage via [`GridapCallback`](@ref); for example, the Euler equations with an electrostatic potential, [`CompressibleEulerPoissonEquations2D`](@ref). See [the documentation of the bridge](docs/src/trixi_gridap_bridge.md)
 
 ## Installation
 
