@@ -97,12 +97,14 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_min = 0.001,
                                           alpha_smooth = true,
                                           variable = density_pressure)
+# Low thresholds refine a wide region around the shock, so that the mesh only needs to be
+# adapted every 20 steps; each adaptation also rebuilds the finite element data
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 1,
-                                      med_level = 3, med_threshold = 0.06,
-                                      max_level = 5, max_threshold = 0.2)
+                                      med_level = 3, med_threshold = 0.015,
+                                      max_level = 5, max_threshold = 0.05)
 amr_callback = AMRCallback(semi, amr_controller,
-                           interval = 5,
+                           interval = 20,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true)
 
