@@ -18,6 +18,29 @@ time integration.
 Current scope: 2D, `P4estMesh` with adaptive refinement, DG with polynomial degree 2,
 continuous Q2 elements, serial runs.
 
+## Overview: the flow of a run
+
+The diagram follows a simulation from the setup through the rebuilds after mesh changes to
+the Runge-Kutta stages of a time step. Each lane is one code base, time runs downward, and
+an arrow means "calls or uses":
+
+- **OrdinaryDiffEq.jl** (grey): the time integration, which calls the stage update of the
+  bridge as `stage_limiter!` on each stage;
+- **Application** (violet): what an example provides, i.e., the mesh (from an `.inp` file,
+  or from vertices for tests), the equations with their fluxes and source terms, the weak
+  forms of the finite element problem, and the pointwise `source` and `write` functions;
+  the Euler-Poisson example serves as illustration;
+- **Trixi.jl** (blue): the DG solver, the right-hand side, and the mesh adaptation;
+- **Bridge tools** (pink): the generic parts of the bridge in AeroTrixi.jl;
+- **p4est** (amber): the forest, its connectivity and adaptation, and the node numbering
+  `p4est_lnodes`;
+- **Gridap.jl** (green): the model, the finite element spaces, assembly, and solution.
+
+[![Flow of a Trixi.jl run with a Gridap.jl problem](assets/trixi_gridap_bridge_flow.svg)](assets/trixi_gridap_bridge_flow.svg)
+
+The diagram is also available as a separate file,
+[`docs/src/assets/trixi_gridap_bridge_flow.svg`](assets/trixi_gridap_bridge_flow.svg).
+
 ## Foundations
 
 ### Matching nodes: DG with `polydeg = 2` and Q2 elements
