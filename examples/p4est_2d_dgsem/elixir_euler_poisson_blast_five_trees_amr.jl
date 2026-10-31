@@ -17,14 +17,14 @@ using LinearAlgebra: cholesky, Symmetric
 # adapted mesh, and φ and E are written into the DG solution. The matrix factorization is
 # reused until the mesh changes; after each mesh adaptation (and at the start), a callback
 # rebuilds it and updates φ and E on the new mesh.
-# The force of the field on the flow (`source_terms_electrostatic`) is switched off with
+# The force of the field on the flow (`source_terms_euler_poisson`) is switched off with
 # `coupling = 0`: the potential follows the density, but does not act on the flow yet.
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
 # OrdinaryDiffEqLowStorageRK.jl, Gridap.jl, and LinearAlgebra in the active environment.
 # The documentation page "Trixi.jl-Gridap.jl bridge" shows how to plot the results.
 
-equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 0.0)
+equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 10.0)
 
 # Background density of the Poisson problem
 const RHO_0 = 1.0
@@ -71,7 +71,7 @@ boundary_conditions = (; x_neg = boundary_condition_do_nothing,
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions,
-                                    source_terms = source_terms_electrostatic)
+                                    source_terms = source_terms_euler_poisson)
 
 ###############################################################################
 # ODE solvers, callbacks etc.
@@ -96,12 +96,14 @@ amr_indicator = IndicatorHennemannGassner(semi,
                                           alpha_min = 0.001,
                                           alpha_smooth = true,
                                           variable = density_pressure)
+                                          
 # Low thresholds refine a wide region around the shock, so that the mesh only needs to be
 # adapted every 20 steps; each adaptation also rebuilds the finite element data
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 1,
                                       med_level = 3, med_threshold = 0.015,
                                       max_level = 5, max_threshold = 0.05)
+
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 20,
                            adapt_initial_condition = true,
@@ -110,15 +112,16 @@ amr_callback = AMRCallback(semi, amr_controller,
 # Poisson problem -Δφ = ρ - ρ0 with φ = 0 on all sides of the box, in weak form
 # ∫ ∇v ⋅ ∇φ = ∫ v (ρ - ρ0). The matrix is symmetric positive definite, also with the
 # hanging-node constraints.
-poisson_problem = GridapLinearProblem((φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
-                                      (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
-                                      factorize = A -> cholesky(Symmetric(A)))
+poisson_problem = GridapLinearProblem( linear_problem_euler_poisson, 
+                                       factorize = A -> cholesky(Symmetric(A)) )
+
 # The source ρ - ρ0 is transferred from the DG solution; `write_electrostatic` sets the
 # variables φ, E1, E2 of the DG solution
 poisson_callback = GridapCallback(semi, poisson_problem;
                                   source = (u, x, equations) -> SVector(u[1] - RHO_0),
                                   write = write_electrostatic,
                                   dirichlet_tags = (:x_neg, :x_pos, :y_neg, :y_pos))
+
 # Solve the Poisson problem on each Runge-Kutta stage, called by the time integration method
 # as `stage_limiter!`; the callback then only acts after mesh changes
 poisson_stage_update = gridap_stage_update(poisson_callback)
@@ -136,9 +139,21 @@ callbacks = CallbackSet(summary_callback,
 ###############################################################################
 # run the simulation
 
+println(equations.coupling);
+
 # The stage limiter is only called with `williamson_condition = false`
 sol = solve(ode,
             CarpenterKennedy2N54(; stage_limiter! = poisson_stage_update,
                                  williamson_condition = false);
             dt = 1, # solve needs some value here but it will be overwritten by the stepsize_callback
             ode_default_options()..., callback = callbacks);
+
+using Plots
+pd = PlotData2D(sol)
+p1 = plot(pd["rho"], title = "density at t = $(sol.t[end])")
+plot!(p1, getmesh(pd), linecolor = :white, linewidth = 0.3)
+p2 = plot(pd["phi"], title = "potential φ", color = :balance)
+plot!(p2, getmesh(pd), linecolor = :black, linewidth = 0.2)
+p3 = plot(pd["E1"], title = "E1 = -∂φ/∂x", color = :balance)
+p4 = plot(pd["E2"], title = "E2 = -∂φ/∂y", color = :balance)
+plot(p1, p2, p3, p4, layout = (2, 2), size = (1100, 900))

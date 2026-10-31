@@ -16,7 +16,7 @@ The Euler part is the one of `CompressibleEulerEquations2D(gamma)`. The potentia
 field have no flux and no numerical dissipation, so that they are not changed by the time
 integration of the DG discretization. They are set by a callback that solves the Poisson
 problem for ``\phi`` (see [`GridapCallback`](@ref) and [`write_electrostatic`](@ref)) and
-act on the flow through the source terms [`source_terms_electrostatic`](@ref), scaled by
+act on the flow through the source terms [`source_terms_euler_poisson`](@ref), scaled by
 `coupling`.
 """
 struct CompressibleEulerPoissonEquations2D{RealT <: Real,
@@ -37,22 +37,50 @@ end
 function varnames(::typeof(cons2cons), ::CompressibleEulerPoissonEquations2D)
     return ("rho", "rho_v1", "rho_v2", "rho_e_total", "phi", "E1", "E2")
 end
+
 function varnames(::typeof(cons2prim), ::CompressibleEulerPoissonEquations2D)
     return ("rho", "v1", "v2", "p", "phi", "E1", "E2")
 end
 
 # Euler part of the state and extension of Euler quantities by the electrostatic part
 @inline euler_variables(u) = SVector(u[1], u[2], u[3], u[4])
+@inline electrostatic_variables(u) = SVector(u[5], u[6], u[7])
+
 @inline function with_electrostatic(euler_values, electrostatic_values)
     return SVector(euler_values[1], euler_values[2], euler_values[3], euler_values[4],
                    electrostatic_values[1], electrostatic_values[2],
                    electrostatic_values[3])
 end
+
 @inline function with_zero_electrostatic(euler_values)
     z = zero(eltype(euler_values))
     return with_electrostatic(euler_values, SVector(z, z, z))
 end
-@inline electrostatic_variables(u) = SVector(u[5], u[6], u[7])
+
+
+@doc raw"""
+    source_terms_euler_poisson(u, x, t, equations::CompressibleEulerPoissonEquations2D)
+
+Force of the electric field on the flow, scaled by `equations.coupling`:
+``c \rho E`` in the momentum equations and ``c \rho v \cdot E`` in the energy equation.
+The potential and the field have no source terms; they are set by a callback.
+"""
+@inline function source_terms_euler_poisson(u, x, t,
+                                            equations::CompressibleEulerPoissonEquations2D)
+    rho, rho_v1, rho_v2, _, _, E1, E2 = u
+    c = equations.coupling
+    z = zero(eltype(u))
+    return SVector(z, c * rho * E1, c * rho * E2, c * (rho_v1 * E1 + rho_v2 * E2), z,
+                   z, z)
+end
+
+
+function linear_problem_euler_poisson
+    return(
+        (φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
+        (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
+    )
+end
 
 @inline function flux(u, orientation_or_normal_direction,
                       equations::CompressibleEulerPoissonEquations2D)
@@ -128,21 +156,7 @@ end
     return energy_total(euler_variables(u), equations.euler)
 end
 
-@doc raw"""
-    source_terms_electrostatic(u, x, t, equations::CompressibleEulerPoissonEquations2D)
 
-Force of the electric field on the flow, scaled by `equations.coupling`:
-``c \rho E`` in the momentum equations and ``c \rho v \cdot E`` in the energy equation.
-The potential and the field have no source terms; they are set by a callback.
-"""
-@inline function source_terms_electrostatic(u, x, t,
-                                            equations::CompressibleEulerPoissonEquations2D)
-    rho, rho_v1, rho_v2, _, _, E1, E2 = u
-    c = equations.coupling
-    z = zero(eltype(u))
-    return SVector(z, c * rho * E1, c * rho * E2, c * (rho_v1 * E1 + rho_v2 * E2), z,
-                   z, z)
-end
 
 @doc raw"""
     write_electrostatic(u, q, x, equations::CompressibleEulerPoissonEquations2D)
