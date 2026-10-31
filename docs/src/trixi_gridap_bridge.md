@@ -120,7 +120,7 @@ Dirichlet conditions is symmetric positive definite and can be factorized with C
 | [`transfer_dg_to_q2!`](@ref) | DG solution → node values (averaging, constraints) |
 | [`transfer_q2_to_dg!`](@ref), [`q2_value`](@ref), [`q2_gradient`](@ref) | node values → DG solution (injection, element-wise gradients) |
 | [`GridapCallback`](@ref), [`gridap_stage_update`](@ref) | finite element solves during the time integration |
-| [`elliptic_fields`](@ref), [`elliptic_sources`](@ref), [`elliptic_forms`](@ref), [`write_elliptic_solution`](@ref), [`elliptic_symmetric`](@ref), [`Q2Field`](@ref) | elliptic part of equations |
+| [`elliptic_fields`](@ref), [`elliptic_sources`](@ref), [`elliptic_forms`](@ref), [`write_elliptic_solution`](@ref), [`elliptic_spd`](@ref), [`Q2Field`](@ref) | elliptic part of equations |
 | [`CompressibleEulerPoissonEquations2D`](@ref), [`source_terms_euler_poisson`](@ref) | Euler equations with electrostatic potential |
 
 The Gridap.jl parts are a package extension of AeroTrixi.jl, which is loaded together with
@@ -140,7 +140,7 @@ an elliptic part implement, dispatched on their type:
   of fields;
 - [`write_elliptic_solution`](@ref)`(u, q, x, equations)`: the new state at a DG node from
   the solution;
-- optionally [`elliptic_symmetric`](@ref)`(equations)`: `true` for a symmetric positive
+- optionally [`elliptic_spd`](@ref)`(equations)`: `true` for a symmetric positive
   definite matrix (Cholesky instead of LU).
 
 The weak forms use Gridap.jl notation, but the equations do not depend on Gridap.jl: the
@@ -149,7 +149,7 @@ operators from it. For the Euler-Poisson equations, all parts are in the file of
 equations, `src/equations/compressible_euler_poisson_2d.jl`:
 ```julia
 elliptic_fields(::CompressibleEulerPoissonEquations2D) = (phi = Q2Field(),)
-elliptic_symmetric(::CompressibleEulerPoissonEquations2D) = true
+elliptic_spd(::CompressibleEulerPoissonEquations2D) = true
 
 elliptic_sources(u, x, equations::CompressibleEulerPoissonEquations2D) =
     SVector(u[1] - equations.rho_0)
@@ -193,7 +193,7 @@ functions):
 
 After each mesh change, the [`GridapCallback`](@ref) assembles the matrix of the bilinear
 form of [`elliptic_forms`](@ref), with homogeneous Dirichlet conditions on the boundaries in
-`dirichlet_tags`, and factorizes it: with Cholesky if [`elliptic_symmetric`](@ref) is `true`,
+`dirichlet_tags`, and factorizes it: with Cholesky if [`elliptic_spd`](@ref) is `true`,
 with LU otherwise. The linear form must be affine in the sources; then the load vector is
 ``b = b_0 + \sum_k B_k f_k`` for the source values ``f_k`` at the nodes, and the callback also
 assembles ``b_0`` and the matrices ``B_k`` once per mesh (checked against a direct assembly
@@ -283,15 +283,15 @@ plot(p1, p2, p3, p4, layout = (2, 2), size = (1100, 900))
 
 All timings: Julia 1.13, one thread, after compilation (a short run first).
 
-**Example run.** 313 time steps up to `t = 0.3` (2324 cells at the end), mesh adaptation
-every 20 steps; 11.1 s in total:
+**Example run.** 315 time steps up to `t = 0.3` (3899 cells at the end), mesh adaptation
+every 10 steps; 16.1 s in total:
 
 | part | calls | time | per call |
 |---|---|---|---|
-| Trixi.jl right-hand side | 1570 | 5.4 s | 3.5 ms |
-| Gridap.jl stage updates (DG → Q2, solve, Q2 → DG) | 1560 | 3.3 s | 2.1 ms |
-| Gridap.jl rebuilds after mesh changes (incl. first) | 16 | 1.3 s | 82 ms |
-| mesh adaptation (Trixi.jl) | 15 | 0.3 s | 17 ms |
+| Trixi.jl right-hand side | 1580 | 7.1 s | 4.5 ms |
+| Gridap.jl stage updates (DG → Q2, solve, Q2 → DG) | 1570 | 4.3 s | 2.7 ms |
+| Gridap.jl rebuilds after mesh changes (incl. first) | 32 | 3.2 s | 99 ms |
+| mesh adaptation (Trixi.jl) | 31 | 0.7 s | 21 ms |
 
 A stage update costs about 60% of a right-hand side evaluation of Trixi.jl; its main part
 is the solve with the Cholesky factorization. A rebuild (node numbering, Gridap.jl model
@@ -315,23 +315,31 @@ after 6–11 solves (1–2 time steps with stage updates), compared with assembl
 vector for each solve.
 
 **Adaptation interval and refinement.** Since each mesh change also rebuilds the finite
-element data, the interval of the mesh adaptation matters. For the example, measured with
-`coupling = 0` (wall times of the whole run without the analysis and output callbacks; L1 error of the density at `t = 0.3` against a uniform run at the finest
-level 5 with 20480 cells):
+element data, the interval of the mesh adaptation matters, and so do the thresholds of the
+refinement. For the example (wall times of the whole run without the analysis and output
+callbacks; L1 error of the density at `t = 0.3` against a coupled uniform run at the finest
+level 5 with 20480 cells, which takes 87.6 s):
 
-| AMR interval | AMR thresholds | mean cells | time | rebuilds | L1 error |
+| AMR interval | AMR thresholds | mean / max cells | time | rebuilds | L1 error |
 |---|---|---|---|---|---|
-| 5 | 0.06 / 0.2 | 2722 | 19.8 s | 67 | 1.75e-2 |
-| 20 | 0.06 / 0.2 | 2858 | 14.2 s | 17 | 2.02e-2 |
-| 5 | 0.015 / 0.05 | 3381 | 23.5 s | 67 | 7.1e-3 |
-| 20 | 0.015 / 0.05 | 3483 | 16.2 s | 17 | 5.9e-3 |
-| 40 | 0.015 / 0.05 | 3430 | 14.4 s | 9 | 1.2e-2 |
+| 20 | 0.06 / 0.2 | 1641 / 2228 | 6.7 s | 15 | 2.7e-2 |
+| 5 | 0.015 / 0.05 | 2399 / 3056 | 15.7 s | 63 | 1.6e-2 |
+| 20 | 0.015 / 0.05 | 2426 / 3041 | 9.8 s | 16 | 1.6e-2 |
+| 5 | 0.005 / 0.015 | 3098 / 3986 | 20.2 s | 63 | 5.9e-3 |
+| **10** | **0.005 / 0.015** | **3088 / 4085** | **15.3 s** | **32** | **5.8e-3** |
+| 20 | 0.005 / 0.015 | 3067 / 3680 | 12.5 s | 16 | 7.1e-3 |
+| 40 | 0.005 / 0.015 | 2636 / 3380 | 10.1 s | 8 | 1.5e-2 |
+| 10 | 0.002 / 0.006 | 3403 / 4472 | 16.7 s | 32 | 4.1e-3 |
+| uniform level 4 | | 5120 | 8.7 s | | 1.5e-2 |
 
-Lower thresholds refine a wider region around the shock. With them, the mesh can be adapted
-less often without losing the shock, which reduces the rebuilds; beyond about 20 steps,
-the shock leaves the refined region between two adaptations. The example uses the interval
-20 with the lower thresholds. For comparison, the uniform run at level 5 (Euler equations
-only, without the Poisson problem) takes 38.6 s.
+With the coupling, the field spreads the density perturbations as waves, and the
+thresholds decide how much of them is resolved: with 0.015 / 0.05, the adaptive run is no
+more accurate than the uniform run at level 4, which is also faster, since the adaptive
+mesh needs the time step of level 5. Lower thresholds reduce the error by a factor of 3 to
+4. Between two adaptations, the refined region must still contain the waves; beyond about
+10–20 steps, the error grows again (interval 40). The example uses the thresholds
+0.005 / 0.015 and the interval 10, with up to about 4000 cells. Raising the middle level
+from 3 to 4 (not shown) changes little.
 
 ## Limitations and outlook
 

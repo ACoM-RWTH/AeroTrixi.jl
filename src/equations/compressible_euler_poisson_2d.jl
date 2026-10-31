@@ -162,7 +162,7 @@ end
 elliptic_fields(::CompressibleEulerPoissonEquations2D) = (phi = Q2Field(),)
 
 # The matrix of the Poisson problem is symmetric positive definite
-elliptic_symmetric(::CompressibleEulerPoissonEquations2D) = true
+elliptic_spd(::CompressibleEulerPoissonEquations2D) = true
 
 # Source of the Poisson problem at a DG node
 @inline function elliptic_sources(u, x, equations::CompressibleEulerPoissonEquations2D)

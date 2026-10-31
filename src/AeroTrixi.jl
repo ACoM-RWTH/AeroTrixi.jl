@@ -76,7 +76,7 @@ export transfer_dg_to_q2!, transfer_q2_to_dg!, Q2NodeData, q2_value, q2_gradient
 export CompressibleEulerPoissonEquations2D, source_terms_euler_poisson
 export GridapCallback, gridap_stage_update
 export Q2Field, elliptic_fields, elliptic_sources, elliptic_forms, write_elliptic_solution,
-       elliptic_symmetric
+       elliptic_spd
 export gridap_q2_function, gridap_node_values
 
 end

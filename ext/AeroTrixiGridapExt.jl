@@ -2,7 +2,7 @@ module AeroTrixiGridapExt
 
 using AeroTrixi: AeroTrixi, P4estLnodesQ2, elliptic_fields, elliptic_sources,
                  elliptic_forms,
-                 write_elliptic_solution, elliptic_symmetric, Q2Field,
+                 write_elliptic_solution, elliptic_spd, Q2Field,
                  transfer_dg_to_q2!, transfer_q2_to_dg!,
                  gridap_model, gridap_q2_space, gridap_q2_function, gridap_node_values,
                  apply_hanging_constraints!,
@@ -384,7 +384,7 @@ function elliptic_setup(equations, q2, model, n_sources, quadrature_degree)
         A = assemble_matrix((u, v) -> bilinear_form(u, v, dΩ), trial_space, q2.space)
     end
     @trixi_timeit timer() "factorize" begin
-        factorization = elliptic_symmetric(equations) ? cholesky(Symmetric(A)) : lu(A)
+        factorization = elliptic_spd(equations) ? cholesky(Symmetric(A)) : lu(A)
     end
     @trixi_timeit timer() "load matrices" begin
         load = load_matrices(linear_form, q2, model, dΩ, n_sources)

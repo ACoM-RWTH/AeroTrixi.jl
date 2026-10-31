@@ -24,7 +24,7 @@ the `CallbackSet`, so that the solution is recomputed after mesh changes.
 
 After each mesh change (detected with the `revision` counter of `p4est`), the callback
 rebuilds the node numbering, the Gridap.jl model and space, the matrix with its
-factorization (Cholesky if [`elliptic_symmetric`](@ref), LU otherwise), and the matrices
+factorization (Cholesky if [`elliptic_spd`](@ref), LU otherwise), and the matrices
 that map the source values to the load vector. A solve then only needs sparse
 matrix-vector products and the solve with the factorization.
 
@@ -81,7 +81,7 @@ fields, e.g., a velocity and a pressure.
 
 Equations with an elliptic part implement `elliptic_fields`, [`elliptic_sources`](@ref),
 [`elliptic_forms`](@ref), and [`write_elliptic_solution`](@ref), and optionally
-[`elliptic_symmetric`](@ref); a [`GridapCallback`](@ref) then solves the elliptic part with
+[`elliptic_spd`](@ref); a [`GridapCallback`](@ref) then solves the elliptic part with
 `GridapCallback(semi; dirichlet_tags)`.
 """
 function elliptic_fields end
@@ -121,10 +121,10 @@ elliptic part of `equations`; `q2_value(q, k)` and `q2_gradient(q, k)` give the 
 function write_elliptic_solution end
 
 """
-    elliptic_symmetric(equations)
+    elliptic_spd(equations)
 
 Whether the matrix of the elliptic part of `equations` is symmetric positive definite, so
 that it is factorized with Cholesky instead of LU. Default: `false`.
 """
-elliptic_symmetric(equations) = false
+elliptic_spd(equations) = false
 end # @muladd
