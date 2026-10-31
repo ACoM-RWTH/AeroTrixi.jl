@@ -244,8 +244,12 @@ combines all parts:
 - [`CompressibleEulerPoissonEquations2D`](@ref) with the variables
   ``(\rho, \rho v_1, \rho v_2, \rho e, \phi, E_1, E_2)``; the potential and the field have no
   flux in the DG discretization, they are only set by the bridge. The force of the field on
-  the flow, [`source_terms_euler_poisson`](@ref), is scaled by `coupling`, which is zero in
-  the example: the potential follows the density but does not act on the flow yet.
+  the flow, [`source_terms_euler_poisson`](@ref), is scaled by `coupling = 300` in the
+  example. The field repels density excess, and its force is then comparable to the pressure
+  forces of the blast: compared with the uncoupled case, the shock is weaker, the rarefied
+  core refills, and the potential and the field oscillate in rings. (With `coupling = 0`,
+  the potential follows the density without acting on the flow; at `coupling = 1`, the
+  density changes by less than 1%.)
 - A pressure blast (pressure 2 inside the radius 0.3, 1 outside, constant density) on the
   five-tree mesh of ``[-1, 1]^2``, DG with `polydeg = 2`, shock capturing, and adaptive mesh
   refinement between the levels 1 and 5.
@@ -279,17 +283,17 @@ plot(p1, p2, p3, p4, layout = (2, 2), size = (1100, 900))
 
 All timings: Julia 1.13, one thread, after compilation (a short run first).
 
-**Example run.** 336 time steps up to `t = 0.3`, about 3000–4300 cells
-(4262 at the end), mesh adaptation every 20 steps; 18.2 s in total:
+**Example run.** 313 time steps up to `t = 0.3` (2324 cells at the end), mesh adaptation
+every 20 steps; 11.1 s in total:
 
 | part | calls | time | per call |
 |---|---|---|---|
-| Trixi.jl right-hand side | 1680 | 8.6 s | 5.1 ms |
-| Gridap.jl stage updates (DG → Q2, solve, Q2 → DG) | 1680 | 4.8 s | 2.9 ms |
-| Gridap.jl rebuilds after mesh changes (incl. first) | 17 | 2.8 s | 162 ms |
-| mesh adaptation (Trixi.jl) | 16 | 0.9 s | 53 ms |
+| Trixi.jl right-hand side | 1570 | 5.4 s | 3.5 ms |
+| Gridap.jl stage updates (DG → Q2, solve, Q2 → DG) | 1560 | 3.3 s | 2.1 ms |
+| Gridap.jl rebuilds after mesh changes (incl. first) | 16 | 1.3 s | 82 ms |
+| mesh adaptation (Trixi.jl) | 15 | 0.3 s | 17 ms |
 
-A stage update costs about half of a right-hand side evaluation of Trixi.jl; its main part
+A stage update costs about 60% of a right-hand side evaluation of Trixi.jl; its main part
 is the solve with the Cholesky factorization. A rebuild (node numbering, Gridap.jl model
 and space, assembly and factorization of the matrix, load matrices) costs about as much as
 one time step.
@@ -311,8 +315,8 @@ after 6–11 solves (1–2 time steps with stage updates), compared with assembl
 vector for each solve.
 
 **Adaptation interval and refinement.** Since each mesh change also rebuilds the finite
-element data, the interval of the mesh adaptation matters. For the example (wall times
-of the whole run without the analysis and output callbacks; L1 error of the density at `t = 0.3` against a uniform run at the finest
+element data, the interval of the mesh adaptation matters. For the example, measured with
+`coupling = 0` (wall times of the whole run without the analysis and output callbacks; L1 error of the density at `t = 0.3` against a uniform run at the finest
 level 5 with 20480 cells):
 
 | AMR interval | AMR thresholds | mean cells | time | rebuilds | L1 error |

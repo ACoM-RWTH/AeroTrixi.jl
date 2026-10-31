@@ -15,15 +15,17 @@ import Gridap
 # are written into the DG solution. The matrix factorization is reused until the mesh
 # changes; after each mesh adaptation (and at the start), a callback rebuilds it and updates
 # φ and E on the new mesh.
-# The force of the field on the flow (`source_terms_euler_poisson`) is switched off with
-# `coupling = 0`: the potential follows the density, but does not act on the flow yet.
+# The force of the field on the flow (`source_terms_euler_poisson`) is scaled by `coupling`.
+# The field repels density excess; with `coupling = 300`, its force is comparable to the
+# pressure forces of the blast (with `coupling = 0`, the potential only follows the density).
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
 # OrdinaryDiffEqLowStorageRK.jl and Gridap.jl in the active environment.
 # The documentation page "Trixi.jl-Gridap.jl bridge" shows how to plot the results.
 
-# Background density rho_0 of the Poisson problem
-equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 0.0, rho_0 = 1.0)
+# Strength of the force of the field on the flow and background density rho_0 of the
+# Poisson problem
+equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 300.0, rho_0 = 1.0)
 
 """
     initial_condition_blast_pressure(x, t, equations::CompressibleEulerPoissonEquations2D)
