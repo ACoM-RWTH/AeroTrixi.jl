@@ -1,6 +1,8 @@
 module AeroTrixiGridapExt
 
-using AeroTrixi: AeroTrixi, P4estLnodesQ2, GridapLinearProblem, gridap_setup,
+using AeroTrixi: AeroTrixi, P4estLnodesQ2, GridapLinearProblem, GridapCallback,
+                 gridap_setup, elliptic_fields, elliptic_sources, elliptic_forms,
+                 write_elliptic_solution, elliptic_symmetric, Q2Field, AbstractEquations,
                  gridap_solve, transfer_dg_to_q2!, transfer_q2_to_dg!,
                  gridap_model, gridap_q2_space, gridap_q2_function, gridap_node_values,
                  apply_hanging_constraints!,
@@ -11,7 +13,7 @@ using Gridap: Gridap
 using Gridap.CellData: Measure
 using Gridap.FESpaces: TrialFESpace, assemble_matrix, assemble_vector
 using StaticArrays: SVector
-using LinearAlgebra: mul!, norm
+using LinearAlgebra: mul!, norm, cholesky, Symmetric, lu
 using Gridap.Arrays: Table, Fill
 using Gridap.Fields: Point
 using Gridap.ReferenceFEs: QUAD, LagrangianRefFE
@@ -281,6 +283,15 @@ function AeroTrixi.GridapCallback(semi, problem; source, write, dirichlet_tags =
                             initialize = initialize_gridap_callback!)
 end
 
+# Callback for the elliptic part of the equations of `semi`
+function AeroTrixi.GridapCallback(semi; dirichlet_tags = (), interval = 1,
+                                  problem_kwargs...)
+    _, equations, _, _ = mesh_equations_solver_cache(semi)
+    problem = GridapLinearProblem(equations; problem_kwargs...)
+    return GridapCallback(semi, problem; source = elliptic_sources,
+                          write = write_elliptic_solution, dirichlet_tags, interval)
+end
+
 function AeroTrixi.gridap_stage_update(cb::DiscreteCallback{<:Any,
                                                             <:GridapCallbackUpdate})
     update = cb.affect!
@@ -371,6 +382,26 @@ function gridap_mesh_data(u_ode, semi, update)
     source_nodes = zeros(n_sources, length(q2.node_to_dof))
     return GridapMeshData(Int(mesh.p4est.revision[]), ncells(mesh), lnodes, q2, setup,
                           source_nodes)
+end
+
+# Linear problem of the elliptic part of the equations, with the forms written for tuples of
+# fields; currently with one scalar Q2 field
+function AeroTrixi.GridapLinearProblem(equations::AbstractEquations;
+                                       factorize = default_factorize(equations),
+                                       quadrature_degree = 4, precompute_load = true)
+    fields = elliptic_fields(equations)
+    if !(length(fields) == 1 && only(fields) == Q2Field(components = 1))
+        throw(ArgumentError("only a single scalar `Q2Field` is supported, got $fields"))
+    end
+    a, l = elliptic_forms(equations, Gridap)
+    bilinear_form = (u, v, dΩ) -> a((u,), (v,), dΩ)
+    linear_form = (v, sources, dΩ) -> l((v,), sources, dΩ)
+    return GridapLinearProblem(bilinear_form, linear_form; factorize, quadrature_degree,
+                               precompute_load)
+end
+
+function default_factorize(equations)
+    return elliptic_symmetric(equations) ? (A -> cholesky(Symmetric(A))) : lu
 end
 
 # Linear problems: assemble and factorize the matrix once per mesh

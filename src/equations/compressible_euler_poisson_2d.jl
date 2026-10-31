@@ -6,7 +6,7 @@
 #! format: noindent
 
 @doc raw"""
-    CompressibleEulerPoissonEquations2D(gamma; coupling = 0)
+    CompressibleEulerPoissonEquations2D(gamma; coupling = 0, rho_0 = 1)
 
 The compressible Euler equations in 2D, extended by an electrostatic potential ``\phi``
 and the electric field ``E = -\nabla \phi``. The variables are
@@ -14,24 +14,31 @@ and the electric field ``E = -\nabla \phi``. The variables are
 
 The Euler part is the one of `CompressibleEulerEquations2D(gamma)`. The potential and the
 field have no flux and no numerical dissipation, so that they are not changed by the time
-integration of the DG discretization. They are set by a callback that solves the Poisson
-problem for ``\phi`` (see [`GridapCallback`](@ref) and [`write_electrostatic`](@ref)) and
-act on the flow through the source terms [`source_terms_euler_poisson`](@ref), scaled by
-`coupling`.
+integration of the DG discretization. They are set by the solution of the elliptic part of
+the equations, the Poisson problem
+```math
+-\Delta \phi = \rho - \rho_0
+```
+with the background density `rho_0`, which a [`GridapCallback`](@ref) solves with
+continuous finite elements (see [`elliptic_forms`](@ref)). The field acts on the flow
+through the source terms [`source_terms_euler_poisson`](@ref), scaled by `coupling`.
 """
 struct CompressibleEulerPoissonEquations2D{RealT <: Real,
                                            Euler <: CompressibleEulerEquations2D} <:
        AbstractEquations{2, 7}
     euler    :: Euler
     coupling :: RealT
+    rho_0    :: RealT
 end
 
-function CompressibleEulerPoissonEquations2D(gamma; coupling = 0)
+function CompressibleEulerPoissonEquations2D(gamma; coupling = 0, rho_0 = 1)
     euler = CompressibleEulerEquations2D(gamma)
     RealT = typeof(euler.gamma)
     return CompressibleEulerPoissonEquations2D{RealT, typeof(euler)}(euler,
                                                                      convert(RealT,
-                                                                             coupling))
+                                                                             coupling),
+                                                                     convert(RealT,
+                                                                             rho_0))
 end
 
 function varnames(::typeof(cons2cons), ::CompressibleEulerPoissonEquations2D)
@@ -57,7 +64,6 @@ end
     return with_electrostatic(euler_values, SVector(z, z, z))
 end
 
-
 @doc raw"""
     source_terms_euler_poisson(u, x, t, equations::CompressibleEulerPoissonEquations2D)
 
@@ -72,14 +78,6 @@ The potential and the field have no source terms; they are set by a callback.
     z = zero(eltype(u))
     return SVector(z, c * rho * E1, c * rho * E2, c * (rho_v1 * E1 + rho_v2 * E2), z,
                    z, z)
-end
-
-
-function linear_problem_euler_poisson
-    return(
-        (φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
-        (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
-    )
 end
 
 @inline function flux(u, orientation_or_normal_direction,
@@ -156,17 +154,32 @@ end
     return energy_total(euler_variables(u), equations.euler)
 end
 
+###############################################################################
+# Elliptic part: the Poisson problem -Δφ = ρ - ρ0 for the potential, solved with continuous
+# finite elements by a `GridapCallback`
 
+# One scalar Q2 field, the potential φ
+elliptic_fields(::CompressibleEulerPoissonEquations2D) = (phi = Q2Field(),)
 
-@doc raw"""
-    write_electrostatic(u, q, x, equations::CompressibleEulerPoissonEquations2D)
+# The matrix of the Poisson problem is symmetric positive definite
+elliptic_symmetric(::CompressibleEulerPoissonEquations2D) = true
 
-Write function of a [`GridapCallback`](@ref) solving for the potential ``\phi``: keep
-the Euler variables of the state `u` and set the potential to ``\phi`` and the field to
-``E = -\nabla \phi``, from the first solution field at the node `q`.
-"""
-@inline function write_electrostatic(u, q, x,
-                                     equations::CompressibleEulerPoissonEquations2D)
+# Source of the Poisson problem at a DG node
+@inline function elliptic_sources(u, x, equations::CompressibleEulerPoissonEquations2D)
+    return SVector(u[1] - equations.rho_0)
+end
+
+# Weak form ∫ ∇v ⋅ ∇φ dΩ = ∫ v (ρ - ρ0) dΩ, with φ = 0 on the Dirichlet boundaries
+function elliptic_forms(::CompressibleEulerPoissonEquations2D, gridap)
+    ∫, ∇, ⋅ = gridap.∫, gridap.∇, gridap.:⋅
+    a((φ,), (v,), dΩ) = ∫(∇(v) ⋅ ∇(φ)) * dΩ
+    l((v,), sources, dΩ) = ∫(v * sources[1]) * dΩ
+    return a, l
+end
+
+# Keep the Euler variables and set the potential φ and the field E = -∇φ
+@inline function write_elliptic_solution(u, q, x,
+                                         equations::CompressibleEulerPoissonEquations2D)
     ∇φ = q2_gradient(q)
     return with_electrostatic(euler_variables(u), SVector(q2_value(q), -∇φ[1], -∇φ[2]))
 end

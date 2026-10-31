@@ -27,9 +27,9 @@ an arrow means "calls or uses":
 - **OrdinaryDiffEq.jl** (grey): the time integration, which calls the stage update of the
   bridge as `stage_limiter!` on each stage;
 - **Application** (violet): what an example provides, i.e., the mesh (from an `.inp` file,
-  or from vertices for tests), the equations with their fluxes and source terms, the weak
-  forms of the finite element problem, and the pointwise `source` and `write` functions;
-  the Euler-Poisson example serves as illustration;
+  or from vertices for tests) and the equations with their fluxes, source terms, and
+  elliptic part (fields, sources, weak forms, and how the solution is written into the DG
+  state); the Euler-Poisson example serves as illustration;
 - **Trixi.jl** (blue): the DG solver, the right-hand side, and the mesh adaptation;
 - **Bridge tools** (pink): the generic parts of the bridge in AeroTrixi.jl;
 - **p4est** (amber): the forest, its connectivity and adaptation, and the node numbering
@@ -121,17 +121,67 @@ Dirichlet conditions is symmetric positive definite and can be factorized with C
 | [`transfer_q2_to_dg!`](@ref), [`q2_value`](@ref), [`q2_gradient`](@ref) | node values → DG solution (injection, element-wise gradients) |
 | [`GridapCallback`](@ref), [`gridap_stage_update`](@ref) | finite element solves during the time integration |
 | [`GridapLinearProblem`](@ref), [`gridap_setup`](@ref), [`gridap_solve`](@ref) | finite element problems of the callback |
-| [`CompressibleEulerPoissonEquations2D`](@ref), [`source_terms_electrostatic`](@ref), [`write_electrostatic`](@ref) | Euler equations with electrostatic potential |
+| [`elliptic_fields`](@ref), [`elliptic_sources`](@ref), [`elliptic_forms`](@ref), [`write_elliptic_solution`](@ref), [`elliptic_symmetric`](@ref), [`Q2Field`](@ref) | elliptic part of equations |
+| [`CompressibleEulerPoissonEquations2D`](@ref), [`source_terms_euler_poisson`](@ref) | Euler equations with electrostatic potential |
 
 The Gridap.jl parts are a package extension of AeroTrixi.jl, which is loaded together with
 Gridap.jl. Load Gridap.jl with `import Gridap` and import only the names you need, e.g.,
 `using Gridap: ∫, ∇, ⋅`; with `using Gridap`, names such as `solve` clash with Trixi.jl and
 OrdinaryDiffEq.jl.
 
+### Elliptic part of the equations
+
+Like fluxes and source terms, the elliptic problem belongs to the equations. Equations with
+an elliptic part implement, dispatched on their type:
+
+- [`elliptic_fields`](@ref)`(equations)`: the unknowns and their spaces, e.g.,
+  `(phi = Q2Field(),)`;
+- [`elliptic_sources`](@ref)`(u, x, equations)`: the source fields at a DG node;
+- [`elliptic_forms`](@ref)`(equations, gridap)`: the weak forms `(a, l)`, written for tuples
+  of fields;
+- [`write_elliptic_solution`](@ref)`(u, q, x, equations)`: the new state at a DG node from
+  the solution;
+- optionally [`elliptic_symmetric`](@ref)`(equations)`: `true` for a symmetric positive
+  definite matrix (Cholesky instead of LU).
+
+The weak forms use Gridap.jl notation, but the equations do not depend on Gridap.jl: the
+bridge passes the Gridap.jl module as the argument `gridap`, and the forms take the
+operators from it. For the Euler-Poisson equations, all parts are in the file of the
+equations, `src/equations/compressible_euler_poisson_2d.jl`:
+```julia
+elliptic_fields(::CompressibleEulerPoissonEquations2D) = (phi = Q2Field(),)
+elliptic_symmetric(::CompressibleEulerPoissonEquations2D) = true
+
+elliptic_sources(u, x, equations::CompressibleEulerPoissonEquations2D) =
+    SVector(u[1] - equations.rho_0)
+
+function elliptic_forms(::CompressibleEulerPoissonEquations2D, gridap)
+    ∫, ∇, ⋅ = gridap.∫, gridap.∇, gridap.:⋅
+    a((φ,), (v,), dΩ) = ∫(∇(v) ⋅ ∇(φ)) * dΩ
+    l((v,), sources, dΩ) = ∫(v * sources[1]) * dΩ
+    return a, l
+end
+
+function write_elliptic_solution(u, q, x, equations::CompressibleEulerPoissonEquations2D)
+    ∇φ = q2_gradient(q)
+    return with_electrostatic(euler_variables(u), SVector(q2_value(q), -∇φ[1], -∇φ[2]))
+end
+```
+With this, `GridapCallback(semi; dirichlet_tags)` solves the elliptic part of the equations
+of `semi` (see below).
+
+Since the forms are written for tuples of fields, a system has the same shape. For the
+Stokes problem with a velocity and a pressure, for example, the fields would be
+`(velocity = Q2Field(components = 2), pressure = ...)` and the bilinear form
+`a((u, p), (v, q), dΩ) = ∫(∇(v) ⊙ ∇(u) - (∇ ⋅ v) * p + q * (∇ ⋅ u)) * dΩ`. The bridge
+currently supports a single scalar Q2 field; vector-valued Q2 fields, a Q1 pressure space,
+and multi-field spaces are the next steps for such systems.
+
 ### User functions of the transfers
 
-Both transfers take a pointwise user function, similar to initial conditions and source
-terms in Trixi.jl:
+The transfers take pointwise functions, similar to initial conditions and source terms in
+Trixi.jl ([`elliptic_sources`](@ref) and [`write_elliptic_solution`](@ref) are such
+functions):
 
 - `source(u, x, equations)` returns an `SVector` of fields at a DG node, e.g.,
   `SVector(u[1] - ρ0)`; [`transfer_dg_to_q2!`](@ref) writes them into a matrix
@@ -139,15 +189,6 @@ terms in Trixi.jl:
 - `write(u, q, x, equations)` returns the new state at a DG node; `q2_value(q, k)` and
   `q2_gradient(q, k)` give the Q2 field `k` and its gradient at this node.
   [`transfer_q2_to_dg!`](@ref) writes the state directly into the DG solution vector.
-
-For the Euler-Poisson equations, [`write_electrostatic`](@ref) keeps the Euler variables and
-sets ``\phi`` and ``E = -\nabla\phi``; it is equivalent to
-```julia
-function write_electrostatic(u, q, x, equations::CompressibleEulerPoissonEquations2D)
-    ∇φ = q2_gradient(q)
-    return SVector(u[1], u[2], u[3], u[4], q2_value(q), -∇φ[1], -∇φ[2])
-end
-```
 
 ### Finite element problems
 
@@ -160,7 +201,9 @@ A [`GridapCallback`](@ref) solves a *problem*, which implements two functions:
   fields).
 
 [`GridapLinearProblem`](@ref) covers linear problems ``a(u, v) = l(v)`` with homogeneous
-Dirichlet conditions, given by their weak forms:
+Dirichlet conditions. `GridapLinearProblem(equations)` takes the weak forms of the elliptic
+part of the equations, with Cholesky or LU according to [`elliptic_symmetric`](@ref); the
+weak forms can also be given directly, e.g., for experiments:
 ```julia
 poisson = GridapLinearProblem((φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
                               (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
@@ -179,10 +222,11 @@ Other problems (e.g., systems or nonlinear problems) can be added by implementin
 ### Time integration: callback and stage updates
 
 ```julia
-callback = GridapCallback(semi, poisson; source, write = write_electrostatic,
-                          dirichlet_tags = (:x_neg, :x_pos, :y_neg, :y_pos))
+callback = GridapCallback(semi; dirichlet_tags = (:x_neg, :x_pos, :y_neg, :y_pos))
 ```
-On its own, the callback solves the problem at the start and after every `interval` time
+solves the elliptic part of the equations of `semi`; the general form
+`GridapCallback(semi, problem; source, write, dirichlet_tags)` takes the problem and the
+pointwise functions explicitly. On its own, the callback solves the problem at the start and after every `interval` time
 steps. The solution is then constant during the stages of a Runge-Kutta step, which limits
 the coupled time integration to first order in time.
 
@@ -221,20 +265,22 @@ combines all parts:
 - [`CompressibleEulerPoissonEquations2D`](@ref) with the variables
   ``(\rho, \rho v_1, \rho v_2, \rho e, \phi, E_1, E_2)``; the potential and the field have no
   flux in the DG discretization, they are only set by the bridge. The force of the field on
-  the flow, [`source_terms_electrostatic`](@ref), is scaled by `coupling`, which is zero in
+  the flow, [`source_terms_euler_poisson`](@ref), is scaled by `coupling`, which is zero in
   the example: the potential follows the density but does not act on the flow yet.
 - A pressure blast (pressure 2 inside the radius 0.3, 1 outside, constant density) on the
   five-tree mesh of ``[-1, 1]^2``, DG with `polydeg = 2`, shock capturing, and adaptive mesh
   refinement between the levels 1 and 5.
-- The Poisson problem ``-\Delta\phi = \rho - \rho_0`` with ``\phi = 0`` on the boundary,
-  solved on each Runge-Kutta stage, with the field ``E = -\nabla\phi``.
+- The Poisson problem ``-\Delta\phi = \rho - \rho_0`` (the elliptic part of the equations,
+  with the background density `rho_0`) with ``\phi = 0`` on the boundary, solved on each
+  Runge-Kutta stage, with the field ``E = -\nabla\phi``.
 
 Run it with
 ```julia
 using Trixi, AeroTrixi
 trixi_include(joinpath(AeroTrixi.examples_dir(), "p4est_2d_dgsem",
-                       "elixir_euler_poisson_blast_five_trees_amr.jl"))
+                       "elixir_euler_poisson_blast_five_trees_amr.jl"));
 ```
+(`trixi_include` returns the solution `sol`; the semicolon keeps the REPL from printing it)
 and plot the density with the mesh, the potential, and the field with Plots.jl:
 ```julia
 using Plots
@@ -307,6 +353,8 @@ only, without the Poisson problem) takes 38.6 s.
 ## Limitations and outlook
 
 - 2D, DG with `polydeg = 2` and Q2 elements, serial runs only.
+- The elliptic part of equations has a single scalar Q2 field; systems such as the Stokes
+  problem need vector-valued Q2 fields, a Q1 pressure space, and multi-field spaces.
 - [`GridapLinearProblem`](@ref) has homogeneous Dirichlet conditions; other boundary
   conditions, systems, or nonlinear problems need their own problem type with
   [`gridap_setup`](@ref) and [`gridap_solve`](@ref).

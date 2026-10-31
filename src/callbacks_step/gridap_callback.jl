@@ -6,6 +6,7 @@
 #! format: noindent
 
 """
+    GridapCallback(semi; dirichlet_tags = (), interval = 1, problem_kwargs...)
     GridapCallback(semi, problem; source, write, dirichlet_tags = (), interval = 1)
 
 Callback that solves a finite element problem with continuous Q2 elements in Gridap.jl on
@@ -14,6 +15,11 @@ called at the start of the simulation and after every `interval` time steps; pla
 an `AMRCallback` in the `CallbackSet`, so that the solution is recomputed after mesh
 changes.
 
+The first form solves the elliptic part of the equations of `semi` (see
+[`elliptic_forms`](@ref)): the problem is `GridapLinearProblem(equations; problem_kwargs...)`,
+the source is [`elliptic_sources`](@ref), and the solution is written with
+[`write_elliptic_solution`](@ref). The second form takes all parts explicitly:
+
 - `problem` describes the finite element problem, e.g., a [`GridapLinearProblem`](@ref);
   see [`gridap_setup`](@ref) and [`gridap_solve`](@ref) for the interface.
 - `source(u_node, x, equations)` returns an `SVector` of source fields at each DG node,
@@ -21,8 +27,7 @@ changes.
   problem.
 - `write(u_node, q, x, equations)` returns the new state at each DG node, see
   [`transfer_q2_to_dg!`](@ref); `q2_value(q, k)` and `q2_gradient(q, k)` give the
-  solution field `k` and its gradient. For [`CompressibleEulerPoissonEquations2D`](@ref),
-  [`write_electrostatic`](@ref) sets the potential and the field.
+  solution field `k` and its gradient.
 - `dirichlet_tags`: boundary names with Dirichlet conditions in the Q2 space.
 
 The node numbering, the Gridap model and spaces, and the result of
@@ -61,6 +66,7 @@ function gridap_stage_update end
 """
     GridapLinearProblem(bilinear_form, linear_form; factorize = lu, quadrature_degree = 4,
                         precompute_load = true)
+    GridapLinearProblem(equations; factorize, quadrature_degree = 4, precompute_load = true)
 
 Linear finite element problem `a(u, v) = l(v)` for all test functions `v`, with
 homogeneous Dirichlet conditions on the `dirichlet_tags` of the [`GridapCallback`](@ref).
@@ -79,6 +85,11 @@ field `k` at all Q2 nodes; the vector `b0` and the matrices `B_k` are assembled 
 mesh change (and checked against a direct assembly with random sources), and each solve only
 needs sparse matrix-vector products and the solve with the factorization. With
 `precompute_load = false`, the load vector is assembled for each solve.
+
+The second form takes the forms of the elliptic part of `equations` from
+[`elliptic_forms`](@ref); by default, the matrix is factorized with Cholesky if
+[`elliptic_symmetric`](@ref) is `true`, and with LU otherwise. This form requires Gridap.jl
+to be loaded (`import Gridap`).
 """
 struct GridapLinearProblem{BilinearForm, LinearForm, Factorize}
     bilinear_form     :: BilinearForm
@@ -121,4 +132,75 @@ Q2 space are converted to node values directly from their degrees of freedom (se
 This function requires Gridap.jl to be loaded (`import Gridap`).
 """
 function gridap_solve end
+
+###############################################################################
+# Elliptic part of equations
+
+"""
+    Q2Field(; components = 1)
+
+Field of the elliptic part of equations (see [`elliptic_fields`](@ref)) in the continuous Q2
+space on the nodes of the DG solution. Currently, only scalar fields (`components = 1`) are
+supported.
+"""
+struct Q2Field
+    components::Int
+end
+Q2Field(; components = 1) = Q2Field(components)
+
+"""
+    elliptic_fields(equations)
+
+Unknowns of the elliptic part of `equations` as a named tuple of their spaces, e.g.,
+`(phi = Q2Field(),)` for a potential. A system such as the Stokes problem would have several
+fields, e.g., a velocity and a pressure.
+
+Equations with an elliptic part implement `elliptic_fields`, [`elliptic_sources`](@ref),
+[`elliptic_forms`](@ref), and [`write_elliptic_solution`](@ref), and optionally
+[`elliptic_symmetric`](@ref); a [`GridapCallback`](@ref) then solves the elliptic part with
+`GridapCallback(semi; dirichlet_tags)`.
+"""
+function elliptic_fields end
+
+"""
+    elliptic_sources(u, x, equations)
+
+Source fields of the elliptic part of `equations` at a DG node with the state `u` and the
+coordinates `x`, as an `SVector`; they are transferred to the Q2 nodes and passed to the
+linear form of [`elliptic_forms`](@ref).
+"""
+function elliptic_sources end
+
+"""
+    elliptic_forms(equations, gridap)
+
+Weak forms `(a, l)` of the elliptic part of `equations`, written with the operators of the
+Gridap.jl module `gridap` (e.g., `∫, ∇, ⋅ = gridap.∫, gridap.∇, gridap.:⋅`), so that the
+equations do not depend on Gridap.jl:
+- `a(us, vs, dΩ)`: bilinear form for the tuples of unknowns `us` and test functions `vs`
+  (one entry per field of [`elliptic_fields`](@ref)),
+- `l(vs, sources, dΩ)`: linear form with the source fields `sources[k]`
+  (see [`elliptic_sources`](@ref)).
+
+`dΩ` is the measure of the mesh. Dirichlet conditions are homogeneous, on the boundaries
+given to the [`GridapCallback`](@ref).
+"""
+function elliptic_forms end
+
+"""
+    write_elliptic_solution(u, q, x, equations)
+
+New state at a DG node with the state `u` and the coordinates `x` from the solution of the
+elliptic part of `equations`; `q2_value(q, k)` and `q2_gradient(q, k)` give the field `k` of
+[`elliptic_fields`](@ref) and its gradient at the node.
+"""
+function write_elliptic_solution end
+
+"""
+    elliptic_symmetric(equations)
+
+Whether the matrix of the elliptic part of `equations` is symmetric positive definite, so
+that it is factorized with Cholesky instead of LU. Default: `false`.
+"""
+elliptic_symmetric(equations) = false
 end # @muladd

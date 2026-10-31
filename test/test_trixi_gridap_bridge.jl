@@ -7,7 +7,6 @@ using OrdinaryDiffEqLowStorageRK
 # Gridap.jl names are imported explicitly to avoid clashes with Trixi.jl (e.g., `solve`)
 import Gridap
 using Gridap: ∫, ∇, ⋅, TrialFESpace, AffineFEOperator
-using LinearAlgebra: cholesky, Symmetric
 
 const BOX_SIDES = (:x_neg, :x_pos, :y_neg, :y_pos)
 
@@ -89,7 +88,7 @@ end
 
         # Q2 → DG: the potential φ = density and its field E = -∇φ by injection and with the
         # derivative matrix of Trixi.jl
-        transfer_q2_to_dg!(write_electrostatic, u_ode, semi, lnodes, node_values)
+        transfer_q2_to_dg!(write_elliptic_solution, u_ode, semi, lnodes, node_values)
         u = Trixi.wrap_array(u_ode, semi)
         x = semi.cache.elements.node_coordinates
         @test u[5, :, :, :] ≈ u[1, :, :, :]
@@ -100,10 +99,8 @@ end
     @testset "GridapCallback: order in time with stage updates" begin
         # With the force of the field on the flow, an update of φ and E once per step
         # limits the time integration to first order; the update on each Runge-Kutta stage
-        # keeps the fourth order of CarpenterKennedy2N54
-        poisson = GridapLinearProblem((φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
-                                      (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
-                                      factorize = A -> cholesky(Symmetric(A)))
+        # keeps the fourth order of CarpenterKennedy2N54. The Poisson problem is the elliptic
+        # part of the equations.
         initial_condition = function (x, t, equations)
             rho = 1 + 0.5 * exp(-20 * ((x[1] - 0.1)^2 + x[2]^2))
             return prim2cons(SVector(rho, 0.2, -0.1, 1.0, 0.0, 0.0, 0.0), equations)
@@ -115,12 +112,9 @@ end
             semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition,
                                                 DGSEM(polydeg = 2);
                                                 boundary_conditions = boundary_condition_do_nothing,
-                                                source_terms = source_terms_electrostatic)
+                                                source_terms = source_terms_euler_poisson)
             ode = semidiscretize(semi, (0.0, 0.1))
-            callback = GridapCallback(semi, poisson;
-                                      source = (u, x, equations) -> SVector(u[1] - 1),
-                                      write = write_electrostatic,
-                                      dirichlet_tags = BOX_SIDES)
+            callback = GridapCallback(semi; dirichlet_tags = BOX_SIDES)
             stage_limiter! = stages ? gridap_stage_update(callback) :
                              OrdinaryDiffEqLowStorageRK.OrdinaryDiffEqCore.trivial_limiter!
             sol = solve(ode,
