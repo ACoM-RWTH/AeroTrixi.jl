@@ -1,9 +1,9 @@
 module AeroTrixiGridapExt
 
-using AeroTrixi: AeroTrixi, P4estLnodesQ2, GridapLinearProblem, GridapCallback,
-                 gridap_setup, elliptic_fields, elliptic_sources, elliptic_forms,
-                 write_elliptic_solution, elliptic_symmetric, Q2Field, AbstractEquations,
-                 gridap_solve, transfer_dg_to_q2!, transfer_q2_to_dg!,
+using AeroTrixi: AeroTrixi, P4estLnodesQ2, elliptic_fields, elliptic_sources,
+                 elliptic_forms,
+                 write_elliptic_solution, elliptic_symmetric, Q2Field,
+                 transfer_dg_to_q2!, transfer_q2_to_dg!,
                  gridap_model, gridap_q2_space, gridap_q2_function, gridap_node_values,
                  apply_hanging_constraints!,
                  DiscreteCallback, isfinished, derivative_discontinuity!,
@@ -251,13 +251,11 @@ struct GridapMeshData{Lnodes, Q2, Setup}
     source_nodes :: Matrix{Float64}
 end
 
-mutable struct GridapCallbackUpdate{Problem, Source, Write, Tags}
-    const problem        :: Problem
-    const source         :: Source
-    const write          :: Write
-    const dirichlet_tags :: Tags
-    const interval       :: Int
-    mesh_data            :: Any
+mutable struct GridapCallbackUpdate{Tags}
+    const dirichlet_tags    :: Tags
+    const interval          :: Int
+    const quadrature_degree :: Int
+    mesh_data               :: Any
     # Set by `gridap_stage_update`: the problem is solved on each Runge-Kutta stage, and the
     # callback only acts after mesh changes
     stages   :: Bool
@@ -265,10 +263,15 @@ mutable struct GridapCallbackUpdate{Problem, Source, Write, Tags}
     n_solves :: Int
 end
 
-function AeroTrixi.GridapCallback(semi, problem; source, write, dirichlet_tags = (),
-                                  interval = 1)
-    update = GridapCallbackUpdate(problem, source, write, Tuple(Symbol.(dirichlet_tags)),
-                                  Int(interval), nothing, false, 0, 0)
+function AeroTrixi.GridapCallback(semi; dirichlet_tags = (), interval = 1,
+                                  quadrature_degree = 4)
+    _, equations, _, _ = mesh_equations_solver_cache(semi)
+    fields = elliptic_fields(equations)
+    if !(length(fields) == 1 && only(fields) == Q2Field(components = 1))
+        throw(ArgumentError("only a single scalar `Q2Field` is supported, got $fields"))
+    end
+    update = GridapCallbackUpdate(Tuple(Symbol.(dirichlet_tags)), Int(interval),
+                                  Int(quadrature_degree), nothing, false, 0, 0)
     condition = function (u, t, integrator)
         if update.stages
             # The stage updates keep the solution up to date as long as the mesh is not
@@ -281,15 +284,6 @@ function AeroTrixi.GridapCallback(semi, problem; source, write, dirichlet_tags =
     end
     return DiscreteCallback(condition, update, save_positions = (false, false),
                             initialize = initialize_gridap_callback!)
-end
-
-# Callback for the elliptic part of the equations of `semi`
-function AeroTrixi.GridapCallback(semi; dirichlet_tags = (), interval = 1,
-                                  problem_kwargs...)
-    _, equations, _, _ = mesh_equations_solver_cache(semi)
-    problem = GridapLinearProblem(equations; problem_kwargs...)
-    return GridapCallback(semi, problem; source = elliptic_sources,
-                          write = write_elliptic_solution, dirichlet_tags, interval)
 end
 
 function AeroTrixi.gridap_stage_update(cb::DiscreteCallback{<:Any,
@@ -329,8 +323,8 @@ function mesh_changed(data, mesh)
            data.n_elements != ncells(mesh)
 end
 
-# Solve the problem with the sources from `update.source` and write the result with
-# `update.write`
+# Solve the elliptic part of the equations with the sources from the DG solution and write
+# the result into it
 function update_gridap!(u_ode, semi, update::GridapCallbackUpdate)
     mesh, equations, _, _ = mesh_equations_solver_cache(semi)
     data = update.mesh_data
@@ -344,21 +338,14 @@ function update_gridap!(u_ode, semi, update::GridapCallbackUpdate)
     @unpack lnodes, q2, setup, source_nodes = data
 
     @trixi_timeit timer() "DG → Q2" begin
-        transfer_dg_to_q2!(update.source, source_nodes, u_ode, semi, lnodes)
+        transfer_dg_to_q2!(elliptic_sources, source_nodes, u_ode, semi, lnodes)
     end
     @trixi_timeit timer() "solve" begin
-        solution = gridap_solve(update.problem, setup, q2, source_nodes)
+        solution = elliptic_solve(setup, source_nodes)
     end
     @trixi_timeit timer() "Q2 → DG" begin
-        if solution isa Tuple
-            # Solution fields as rows
-            solution_nodes = permutedims(reduce(hcat,
-                                                map(uh -> gridap_node_values(uh, q2),
-                                                    solution)))
-        else
-            solution_nodes = gridap_node_values(solution, q2)
-        end
-        transfer_q2_to_dg!(update.write, u_ode, semi, lnodes, solution_nodes)
+        solution_nodes = gridap_node_values(solution, q2)
+        transfer_q2_to_dg!(write_elliptic_solution, u_ode, semi, lnodes, solution_nodes)
     end
     update.n_solves += 1
     return nothing
@@ -375,70 +362,51 @@ function gridap_mesh_data(u_ode, semi, update)
     u = wrap_array(u_ode, semi)
     u_node = get_node_vars(u, equations, solver, 1, 1, 1)
     x_node = get_node_coords(cache.elements.node_coordinates, equations, solver, 1, 1, 1)
-    n_sources = length(update.source(u_node, x_node, equations))
+    n_sources = length(elliptic_sources(u_node, x_node, equations))
     @trixi_timeit timer() "problem" begin
-        setup = gridap_setup(update.problem, q2, model, n_sources)
+        setup = elliptic_setup(equations, q2, model, n_sources, update.quadrature_degree)
     end
     source_nodes = zeros(n_sources, length(q2.node_to_dof))
     return GridapMeshData(Int(mesh.p4est.revision[]), ncells(mesh), lnodes, q2, setup,
                           source_nodes)
 end
 
-# Linear problem of the elliptic part of the equations, with the forms written for tuples of
-# fields; currently with one scalar Q2 field
-function AeroTrixi.GridapLinearProblem(equations::AbstractEquations;
-                                       factorize = default_factorize(equations),
-                                       quadrature_degree = 4, precompute_load = true)
-    fields = elliptic_fields(equations)
-    if !(length(fields) == 1 && only(fields) == Q2Field(components = 1))
-        throw(ArgumentError("only a single scalar `Q2Field` is supported, got $fields"))
-    end
+# Linear elliptic problem of the equations: assemble and factorize the matrix once per mesh.
+# The forms are written for tuples of fields; currently with one scalar Q2 field.
+function elliptic_setup(equations, q2, model, n_sources, quadrature_degree)
     a, l = elliptic_forms(equations, Gridap)
     bilinear_form = (u, v, dΩ) -> a((u,), (v,), dΩ)
     linear_form = (v, sources, dΩ) -> l((v,), sources, dΩ)
-    return GridapLinearProblem(bilinear_form, linear_form; factorize, quadrature_degree,
-                               precompute_load)
-end
-
-function default_factorize(equations)
-    return elliptic_symmetric(equations) ? (A -> cholesky(Symmetric(A))) : lu
-end
-
-# Linear problems: assemble and factorize the matrix once per mesh
-function AeroTrixi.gridap_setup(problem::GridapLinearProblem, q2, model, n_sources)
     # Homogeneous Dirichlet conditions
     trial_space = TrialFESpace(q2.space, 0.0)
-    dΩ = Measure(Triangulation(model), problem.quadrature_degree)
+    dΩ = Measure(Triangulation(model), quadrature_degree)
     @trixi_timeit timer() "assemble" begin
-        A = assemble_matrix((u, v) -> problem.bilinear_form(u, v, dΩ), trial_space,
-                            q2.space)
+        A = assemble_matrix((u, v) -> bilinear_form(u, v, dΩ), trial_space, q2.space)
     end
-    @trixi_timeit timer() "factorize" factorization=problem.factorize(A)
-    load = nothing
-    if problem.precompute_load
-        @trixi_timeit timer() "load matrices" begin
-            load = load_matrices(problem, q2, model, dΩ, n_sources)
-        end
+    @trixi_timeit timer() "factorize" begin
+        factorization = elliptic_symmetric(equations) ? cholesky(Symmetric(A)) : lu(A)
     end
-    return (; trial_space, dΩ, factorization, load)
+    @trixi_timeit timer() "load matrices" begin
+        load = load_matrices(linear_form, q2, model, dΩ, n_sources)
+    end
+    return (; trial_space, factorization, load)
 end
 
-# For a linear form that is affine in the sources, the load vector is
-# `b0 + Σ_k B_k f_k` with the source values `f_k` at all nodes
-function load_matrices(problem, q2, model, dΩ, n_sources)
+# The linear form must be affine in the sources: the load vector is `b0 + Σ_k B_k f_k` with
+# the source values `f_k` at all nodes, so that a solve only needs sparse matrix-vector
+# products and the solve with the factorization
+function load_matrices(linear_form, q2, model, dΩ, n_sources)
     # Space with all nodes as free degrees of freedom, in the order of the nodes
     source_space = gridap_q2_space(q2.lnodes, model).unconstrained
     zero_source = zero(source_space)
     zero_sources = ntuple(_ -> zero_source, n_sources)
-    message = "the linear form is not affine in the sources; use " *
-              "`GridapLinearProblem(...; precompute_load = false)`"
+    message = "the linear form of `elliptic_forms` is not affine in the sources"
     b0, B = try
-        b0 = assemble_vector(v -> problem.linear_form(v, zero_sources, dΩ), q2.space)
+        b0 = assemble_vector(v -> linear_form(v, zero_sources, dΩ), q2.space)
         B = map(1:n_sources) do k
-            assemble_matrix((f, v) -> problem.linear_form(v,
-                                                          ntuple(j -> j == k ? f :
-                                                                      zero_source,
-                                                                 n_sources), dΩ),
+            assemble_matrix((f, v) -> linear_form(v,
+                                                  ntuple(j -> j == k ? f : zero_source,
+                                                         n_sources), dΩ),
                             source_space, q2.space)
         end
         b0, B
@@ -453,7 +421,7 @@ function load_matrices(problem, q2, model, dΩ, n_sources)
     # Check with random sources that the linear form is affine in the sources
     source_nodes = rand(n_sources, length(q2.node_to_dof))
     sources = ntuple(k -> gridap_q2_function(source_nodes, q2; field = k), n_sources)
-    b_assembled = assemble_vector(v -> problem.linear_form(v, sources, dΩ), q2.space)
+    b_assembled = assemble_vector(v -> linear_form(v, sources, dΩ), q2.space)
     load_vector!(b, (; b0, B), source_nodes)
     if norm(b - b_assembled) > 1e-10 * (1 + norm(b_assembled))
         throw(ArgumentError(message))
@@ -469,15 +437,9 @@ function load_vector!(b, load, source_nodes)
     return b
 end
 
-function AeroTrixi.gridap_solve(problem::GridapLinearProblem, setup, q2, source_nodes)
-    @unpack trial_space, dΩ, factorization, load = setup
-    if load === nothing
-        sources = ntuple(k -> gridap_q2_function(source_nodes, q2; field = k),
-                         size(source_nodes, 1))
-        b = assemble_vector(v -> problem.linear_form(v, sources, dΩ), q2.space)
-    else
-        b = load_vector!(load.b, load, source_nodes)
-    end
+function elliptic_solve(setup, source_nodes)
+    @unpack trial_space, factorization, load = setup
+    b = load_vector!(load.b, load, source_nodes)
     return FEFunction(trial_space, factorization \ b)
 end
 
@@ -500,10 +462,8 @@ function Base.show(io::IO, ::MIME"text/plain",
         setup = [
             "update" => update.stages ? "each Runge-Kutta stage" :
                         "every $(update.interval) time steps",
-            "problem" => nameof(typeof(update.problem)),
             "Dirichlet tags" => join(update.dirichlet_tags, ", "),
-            "source" => nameof(typeof(update.source)),
-            "write" => nameof(typeof(update.write))]
+            "quadrature degree" => update.quadrature_degree]
         summary_box(io, "GridapCallback", setup)
     end
     return nothing

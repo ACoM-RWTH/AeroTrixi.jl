@@ -120,7 +120,6 @@ Dirichlet conditions is symmetric positive definite and can be factorized with C
 | [`transfer_dg_to_q2!`](@ref) | DG solution → node values (averaging, constraints) |
 | [`transfer_q2_to_dg!`](@ref), [`q2_value`](@ref), [`q2_gradient`](@ref) | node values → DG solution (injection, element-wise gradients) |
 | [`GridapCallback`](@ref), [`gridap_stage_update`](@ref) | finite element solves during the time integration |
-| [`GridapLinearProblem`](@ref), [`gridap_setup`](@ref), [`gridap_solve`](@ref) | finite element problems of the callback |
 | [`elliptic_fields`](@ref), [`elliptic_sources`](@ref), [`elliptic_forms`](@ref), [`write_elliptic_solution`](@ref), [`elliptic_symmetric`](@ref), [`Q2Field`](@ref) | elliptic part of equations |
 | [`CompressibleEulerPoissonEquations2D`](@ref), [`source_terms_euler_poisson`](@ref) | Euler equations with electrostatic potential |
 
@@ -190,44 +189,24 @@ functions):
   `q2_gradient(q, k)` give the Q2 field `k` and its gradient at this node.
   [`transfer_q2_to_dg!`](@ref) writes the state directly into the DG solution vector.
 
-### Finite element problems
+### Assembly and solution
 
-A [`GridapCallback`](@ref) solves a *problem*, which implements two functions:
-
-- `gridap_setup(problem, q2, model, n_sources)`: mesh-dependent data (e.g., matrix and
-  factorization), computed at the start and after each mesh change;
-- `gridap_solve(problem, setup, q2, source_nodes)`: the solution for the source node values
-  `source_nodes[k, node]`, as a Gridap.jl function (or a tuple of functions for several
-  fields).
-
-[`GridapLinearProblem`](@ref) covers linear problems ``a(u, v) = l(v)`` with homogeneous
-Dirichlet conditions. `GridapLinearProblem(equations)` takes the weak forms of the elliptic
-part of the equations, with Cholesky or LU according to [`elliptic_symmetric`](@ref); the
-weak forms can also be given directly, e.g., for experiments:
-```julia
-poisson = GridapLinearProblem((φ, v, dΩ) -> ∫(∇(v) ⋅ ∇(φ)) * dΩ,
-                              (v, sources, dΩ) -> ∫(v * sources[1]) * dΩ;
-                              factorize = A -> cholesky(Symmetric(A)))
-```
-After each mesh change, it assembles and factorizes the matrix. For a linear form that is
-affine in the sources (the default `precompute_load = true`), it also assembles the matrices
-``B_k`` with the load vector ``b = b_0 + \sum_k B_k f_k`` for the source values ``f_k`` at the
-nodes, so that each solve only needs sparse matrix-vector products and the solve with the
-factorization. Other linear forms need `precompute_load = false`; then the load vector is
-assembled with Gridap.jl for each solve.
-
-Other problems (e.g., systems or nonlinear problems) can be added by implementing
-`AeroTrixi.gridap_setup` and `AeroTrixi.gridap_solve` for a new problem type.
+After each mesh change, the [`GridapCallback`](@ref) assembles the matrix of the bilinear
+form of [`elliptic_forms`](@ref), with homogeneous Dirichlet conditions on the boundaries in
+`dirichlet_tags`, and factorizes it: with Cholesky if [`elliptic_symmetric`](@ref) is `true`,
+with LU otherwise. The linear form must be affine in the sources; then the load vector is
+``b = b_0 + \sum_k B_k f_k`` for the source values ``f_k`` at the nodes, and the callback also
+assembles ``b_0`` and the matrices ``B_k`` once per mesh (checked against a direct assembly
+with random sources). Each solve then only needs sparse matrix-vector products and the solve
+with the factorization.
 
 ### Time integration: callback and stage updates
 
 ```julia
 callback = GridapCallback(semi; dirichlet_tags = (:x_neg, :x_pos, :y_neg, :y_pos))
 ```
-solves the elliptic part of the equations of `semi`; the general form
-`GridapCallback(semi, problem; source, write, dirichlet_tags)` takes the problem and the
-pointwise functions explicitly. On its own, the callback solves the problem at the start and after every `interval` time
-steps. The solution is then constant during the stages of a Runge-Kutta step, which limits
+solves the elliptic part of the equations of `semi`. On its own, the callback solves the
+problem at the start and after every `interval` time steps. The solution is then constant during the stages of a Runge-Kutta step, which limits
 the coupled time integration to first order in time.
 
 For the full order, the problem is solved on each Runge-Kutta stage. The SSPRK and
@@ -355,8 +334,7 @@ only, without the Poisson problem) takes 38.6 s.
 - 2D, DG with `polydeg = 2` and Q2 elements, serial runs only.
 - The elliptic part of equations has a single scalar Q2 field; systems such as the Stokes
   problem need vector-valued Q2 fields, a Q1 pressure space, and multi-field spaces.
-- [`GridapLinearProblem`](@ref) has homogeneous Dirichlet conditions; other boundary
-  conditions, systems, or nonlinear problems need their own problem type with
-  [`gridap_setup`](@ref) and [`gridap_solve`](@ref).
+- The elliptic problems are linear, with homogeneous Dirichlet conditions and a linear form
+  that is affine in the sources.
 - The stage updates require a time integration method with `stage_limiter!` (SSPRK and
   low-storage methods of OrdinaryDiffEq.jl).
