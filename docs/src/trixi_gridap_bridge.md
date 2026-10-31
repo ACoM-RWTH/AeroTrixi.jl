@@ -26,8 +26,8 @@ an arrow means "calls or uses":
 
 - **OrdinaryDiffEq.jl** (grey): the time integration, which calls the stage update of the
   bridge as `stage_limiter!` on each stage;
-- **Application** (violet): what an example provides, i.e., the mesh (from an `.inp` file,
-  or from vertices for tests) and the equations with their fluxes, source terms, and
+- **Application** (violet): what an example provides, i.e., the mesh (from an `.inp` file)
+  and the equations with their fluxes, source terms, and
   elliptic part (fields, sources, weak forms, and how the solution is written into the DG
   state); the Euler-Poisson example serves as illustration;
 - **Trixi.jl** (blue): the DG solver, the right-hand side, and the mesh adaptation;
