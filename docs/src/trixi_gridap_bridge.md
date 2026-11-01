@@ -257,7 +257,22 @@ combines all parts:
   with the background density `rho_0`) with ``\phi = 0`` on the boundary, solved on each
   Runge-Kutta stage, with the field ``E = -\nabla\phi``.
 
-Run it with
+The example needs, besides AeroTrixi.jl, the packages Trixi.jl, OrdinaryDiffEqLowStorageRK.jl,
+Gridap.jl, and Plots.jl (for the plots below). Install them once in a separate environment
+for runs, e.g., in the folder `run/` of the clone of AeroTrixi.jl, which git ignores. Do not
+add them to the environment of the package itself (`julia --project=.` in the clone), since
+`Pkg.add` would change the `Project.toml` of AeroTrixi.jl. In `run/`, start
+`julia --project=.` and execute once
+```julia
+using Pkg
+Pkg.develop(path = "..")  # the clone of AeroTrixi.jl (for a released version: Pkg.add("AeroTrixi"))
+Pkg.add(["Trixi", "OrdinaryDiffEqLowStorageRK", "Gridap", "Plots"])
+```
+This takes a few minutes, mostly for precompilation. `run/Project.toml` and
+`run/Manifest.toml` then record the installed packages; on another machine with a copy of
+these two files, `using Pkg; Pkg.instantiate()` installs the same versions.
+
+Later, start `julia --project=.` in `run/` and run the example with
 ```julia
 using Trixi, AeroTrixi
 trixi_include(joinpath(AeroTrixi.examples_dir(), "p4est_2d_dgsem",
