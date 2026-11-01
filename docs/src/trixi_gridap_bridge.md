@@ -247,9 +247,7 @@ combines all parts:
   the flow, [`source_terms_euler_poisson`](@ref), is scaled by `coupling = 300` in the
   example. The field repels density excess, and its force is then comparable to the pressure
   forces of the blast: compared with the uncoupled case, the shock is weaker, the rarefied
-  core refills, and the potential and the field oscillate in rings. (With `coupling = 0`,
-  the potential follows the density without acting on the flow; at `coupling = 1`, the
-  density changes by less than 1%.)
+  core refills, and the potential and the field oscillate in rings. 
 - A pressure blast (pressure 3 inside the radius 0.3, 1 outside, constant density) on the
   five-tree mesh of ``[-1, 1]^2``, DG with `polydeg = 2`, shock capturing, and adaptive mesh
   refinement between the levels 1 and 5.
@@ -293,6 +291,10 @@ plot(p1, p2, p3, p4, layout = (2, 2), size = (1100, 900))
 ```
 
 ![Density, potential, and field at t = 0.3](assets/trixi_gridap_bridge_blast.png)
+
+Suggestion: Change `coupling = 0` such that the potential follows the density 
+without acting on the flow and you get the pure Euler result for density; at `coupling = 1`, 
+the density changes by less than 1%.
 
 ### Performance
 
