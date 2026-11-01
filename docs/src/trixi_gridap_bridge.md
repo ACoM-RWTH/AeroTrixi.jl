@@ -250,7 +250,7 @@ combines all parts:
   core refills, and the potential and the field oscillate in rings. (With `coupling = 0`,
   the potential follows the density without acting on the flow; at `coupling = 1`, the
   density changes by less than 1%.)
-- A pressure blast (pressure 2 inside the radius 0.3, 1 outside, constant density) on the
+- A pressure blast (pressure 3 inside the radius 0.3, 1 outside, constant density) on the
   five-tree mesh of ``[-1, 1]^2``, DG with `polydeg = 2`, shock capturing, and adaptive mesh
   refinement between the levels 1 and 5.
 - The Poisson problem ``-\Delta\phi = \rho - \rho_0`` (the elliptic part of the equations,
@@ -283,17 +283,17 @@ plot(p1, p2, p3, p4, layout = (2, 2), size = (1100, 900))
 
 All timings: Julia 1.13, one thread, after compilation (a short run first).
 
-**Example run.** 315 time steps up to `t = 0.3` (3899 cells at the end), mesh adaptation
-every 10 steps; 16.1 s in total:
+**Example run.** 373 time steps up to `t = 0.3` (5846 cells at the end), mesh adaptation
+every 20 steps; 21.6 s in total:
 
 | part | calls | time | per call |
 |---|---|---|---|
-| Trixi.jl right-hand side | 1580 | 7.1 s | 4.5 ms |
-| Gridap.jl stage updates (DG → Q2, solve, Q2 → DG) | 1570 | 4.3 s | 2.7 ms |
-| Gridap.jl rebuilds after mesh changes (incl. first) | 32 | 3.2 s | 99 ms |
-| mesh adaptation (Trixi.jl) | 31 | 0.7 s | 21 ms |
+| Trixi.jl right-hand side | 1870 | 11.0 s | 5.9 ms |
+| Gridap.jl stage updates (DG → Q2, solve, Q2 → DG) | 1860 | 5.6 s | 3.0 ms |
+| Gridap.jl rebuilds after mesh changes (incl. first) | 19 | 3.2 s | 169 ms |
+| mesh adaptation (Trixi.jl) | 18 | 0.5 s | 30 ms |
 
-A stage update costs about 60% of a right-hand side evaluation of Trixi.jl; its main part
+A stage update costs about half of a right-hand side evaluation of Trixi.jl; its main part
 is the solve with the Cholesky factorization. A rebuild (node numbering, Gridap.jl model
 and space, assembly and factorization of the matrix, load matrices) costs about as much as
 one time step.
@@ -318,28 +318,28 @@ vector for each solve.
 element data, the interval of the mesh adaptation matters, and so do the thresholds of the
 refinement. For the example (wall times of the whole run without the analysis and output
 callbacks; L1 error of the density at `t = 0.3` against a coupled uniform run at the finest
-level 5 with 20480 cells, which takes 87.6 s):
+level 5 with 20480 cells, which takes 92.0 s):
 
 | AMR interval | AMR thresholds | mean / max cells | time | rebuilds | L1 error |
 |---|---|---|---|---|---|
-| 20 | 0.06 / 0.2 | 1641 / 2228 | 6.7 s | 15 | 2.7e-2 |
-| 5 | 0.015 / 0.05 | 2399 / 3056 | 15.7 s | 63 | 1.6e-2 |
-| 20 | 0.015 / 0.05 | 2426 / 3041 | 9.8 s | 16 | 1.6e-2 |
-| 5 | 0.005 / 0.015 | 3098 / 3986 | 20.2 s | 63 | 5.9e-3 |
-| **10** | **0.005 / 0.015** | **3088 / 4085** | **15.3 s** | **32** | **5.8e-3** |
-| 20 | 0.005 / 0.015 | 3067 / 3680 | 12.5 s | 16 | 7.1e-3 |
-| 40 | 0.005 / 0.015 | 2636 / 3380 | 10.1 s | 8 | 1.5e-2 |
-| 10 | 0.002 / 0.006 | 3403 / 4472 | 16.7 s | 32 | 4.1e-3 |
-| uniform level 4 | | 5120 | 8.7 s | | 1.5e-2 |
+| 20 | 0.06 / 0.2 | 2644 / 3248 | 12.7 s | 19 | 3.7e-2 |
+| 10 | 0.015 / 0.05 | 3627 / 5240 | 20.0 s | 37 | 1.4e-2 |
+| 10 | 0.005 / 0.015 | 4072 / 5855 | 22.3 s | 38 | 9.1e-3 |
+| 20 | 0.005 / 0.015 | 4007 / 5696 | 19.9 s | 19 | 1.0e-2 |
+| 5 | 0.002 / 0.006 | 4322 / 6161 | 32.3 s | 75 | 8.6e-3 |
+| 10 | 0.002 / 0.006 | 4260 / 6077 | 23.7 s | 38 | 7.7e-3 |
+| **20** | **0.002 / 0.006** | **4270 / 6038** | **20.8 s** | **19** | **8.0e-3** |
+| 40 | 0.002 / 0.006 | 3984 / 6710 | 16.6 s | 10 | 1.6e-2 |
+| uniform level 4 | | 5120 | 8.0 s | | 2.9e-2 |
 
-With the coupling, the field spreads the density perturbations as waves, and the
-thresholds decide how much of them is resolved: with 0.015 / 0.05, the adaptive run is no
-more accurate than the uniform run at level 4, which is also faster, since the adaptive
-mesh needs the time step of level 5. Lower thresholds reduce the error by a factor of 3 to
-4. Between two adaptations, the refined region must still contain the waves; beyond about
-10–20 steps, the error grows again (interval 40). The example uses the thresholds
-0.005 / 0.015 and the interval 10, with up to about 4000 cells. Raising the middle level
-from 3 to 4 (not shown) changes little.
+The upper threshold decides the accuracy: the middle threshold (0.002 or 0.005 with the
+upper threshold 0.015) and the middle level (3 or 4) change the error by less than 10%.
+Low thresholds refine a wide region around the shock and the waves of the field; then the
+mesh only needs to be adapted every 20 steps, while after 40 steps the waves leave the
+refined region and the error doubles. The example uses the thresholds 0.002 / 0.006 and
+the interval 20: compared with the uniform run at level 4, the error is 3.7 times smaller
+at 2.6 times the cost (the adaptive mesh needs the time step of level 5), and the run is
+4.4 times faster than the uniform run at level 5.
 
 ## Limitations and outlook
 
