@@ -339,7 +339,9 @@ mesh only needs to be adapted every 20 steps, while after 40 steps the waves lea
 refined region and the error doubles. The example uses the thresholds 0.002 / 0.006 and
 the interval 20: compared with the uniform run at level 4, the error is 3.7 times smaller
 at 2.6 times the cost (the adaptive mesh needs the time step of level 5), and the run is
-4.4 times faster than the uniform run at level 5.
+4.4 times faster than the uniform run at level 5. Note that the performance of the uniform 
+case is misleading as more complicated geometries and problem setups quickly render uniform
+refinement infeasible.
 
 ## Limitations and outlook
 
