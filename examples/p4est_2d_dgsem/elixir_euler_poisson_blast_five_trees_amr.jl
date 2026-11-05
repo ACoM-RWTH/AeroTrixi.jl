@@ -7,7 +7,8 @@ using AeroTrixi
 import Gridap
 
 ###############################################################################
-# Euler equations with an electrostatic potential φ and field E = -∇φ.
+# Euler equations of a charged gas: a single charged species in a uniform neutralizing
+# background of density ρ0, under its own electrostatic potential φ and field E = -∇φ.
 #
 # The state is (ρ, ρv1, ρv2, ρe, φ, E1, E2). The equations contain their elliptic part, the
 # Poisson problem -Δφ = ρ - ρ0 with its weak form. On each Runge-Kutta stage, it is solved
@@ -15,16 +16,20 @@ import Gridap
 # are written into the DG solution. The matrix factorization is reused until the mesh
 # changes; after each mesh adaptation (and at the start), a callback rebuilds it and updates
 # φ and E on the new mesh.
-# The force of the field on the flow (`source_terms_euler_poisson`) is scaled by `coupling`.
-# The field repels density excess; with `coupling = 300`, its force is comparable to the
-# pressure forces of the blast (with `coupling = 0`, the potential only follows the density).
+# The field acts on the flow through `source_terms_euler_poisson`: the force c ρ E in the
+# momentum equations and its work c ρ v⋅E in the energy equation. The coupling constant is
+# c = (q/m)^2 / ε0 = ωp^2 / ρ0, with the charge-to-mass ratio q/m of the species, the
+# permittivity ε0, and the plasma frequency ωp of the background. The field repels density
+# excess; with `coupling = 300` (ωp ≈ 17, oscillation period ≈ 0.36), its force is comparable
+# to the pressure forces of the blast (with `coupling = 0`, the potential only follows the
+# density).
 #
 # Besides AeroTrixi.jl and Trixi.jl, this example requires the packages
 # OrdinaryDiffEqLowStorageRK.jl and Gridap.jl in the active environment.
 # The documentation page "Trixi.jl-Gridap.jl bridge" shows how to plot the results.
 
-# Strength of the force of the field on the flow and background density rho_0 of the
-# Poisson problem
+# Coupling constant c = ωp^2 / ρ0 of the force of the field on the flow and background
+# density rho_0 of the Poisson problem
 equations = CompressibleEulerPoissonEquations2D(1.4; coupling = 300.0, rho_0 = 1.0)
 
 """

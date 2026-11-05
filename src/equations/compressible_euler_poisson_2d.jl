@@ -8,20 +8,35 @@
 @doc raw"""
     CompressibleEulerPoissonEquations2D(gamma; coupling = 0, rho_0 = 1)
 
-The compressible Euler equations in 2D, extended by an electrostatic potential ``\phi``
-and the electric field ``E = -\nabla \phi``. The variables are
-``(\rho, \rho v_1, \rho v_2, \rho e, \phi, E_1, E_2)``.
-
-The Euler part is the one of `CompressibleEulerEquations2D(gamma)`. The potential and the
-field have no flux and no numerical dissipation, so that they are not changed by the time
-integration of the DG discretization. They are set by the solution of the elliptic part of
-the equations, the Poisson problem
+The compressible Euler equations in 2D of a charged gas: a single charged species in a
+uniform neutralizing background of density ``\rho_0``, under its own electrostatic potential
+``\phi`` and field ``E = -\nabla \phi``,
 ```math
--\Delta \phi = \rho - \rho_0
+\begin{aligned}
+\partial_t \rho + \nabla \cdot (\rho v) &= 0, \\
+\partial_t (\rho v) + \nabla \cdot (\rho v \otimes v + p I) &= c \, \rho E, \\
+\partial_t (\rho e) + \nabla \cdot ((\rho e + p) v) &= c \, \rho v \cdot E, \\
+-\Delta \phi = \rho - \rho_0, \qquad E &= -\nabla \phi,
+\end{aligned}
 ```
-with the background density `rho_0`, which a [`GridapCallback`](@ref) solves with
-continuous finite elements (see [`elliptic_forms`](@ref)). The field acts on the flow
-through the source terms [`source_terms_euler_poisson`](@ref), scaled by `coupling`.
+with the coupling constant ``c`` (`coupling`) and the background density ``\rho_0``
+(`rho_0`). The field accelerates the gas and does work on it; for ``c > 0``, it pushes the
+gas from regions of excess density towards regions of deficit. With the charge-to-mass ratio
+``q/m`` of the species and the permittivity ``\varepsilon_0``, the physical potential is
+``\phi_\mathrm{phys} = (q/m) / \varepsilon_0 \, \phi``, and
+```math
+c = \frac{(q/m)^2}{\varepsilon_0} = \frac{\omega_p^2}{\rho_0},
+```
+with the plasma frequency ``\omega_p`` of the background. A negative coupling
+``c = -4 \pi G`` describes self-gravity instead (attraction instead of repulsion).
+
+The variables are ``(\rho, \rho v_1, \rho v_2, \rho e, \phi, E_1, E_2)``. The Euler part is
+the one of `CompressibleEulerEquations2D(gamma)`. The potential and the field have no flux
+and no numerical dissipation, so that they are not changed by the time integration of the
+DG discretization. They are set by the solution of the elliptic part of the equations, the
+Poisson problem, which a [`GridapCallback`](@ref) solves with continuous finite elements
+(see [`elliptic_forms`](@ref)). The field acts on the flow through the source terms
+[`source_terms_euler_poisson`](@ref).
 """
 struct CompressibleEulerPoissonEquations2D{RealT <: Real,
                                            Euler <: CompressibleEulerEquations2D} <:
@@ -67,9 +82,13 @@ end
 @doc raw"""
     source_terms_euler_poisson(u, x, t, equations::CompressibleEulerPoissonEquations2D)
 
-Force of the electric field on the flow, scaled by `equations.coupling`:
-``c \rho E`` in the momentum equations and ``c \rho v \cdot E`` in the energy equation.
-The potential and the field have no source terms; they are set by a callback.
+Force of the electric field on the flow: ``c \rho E`` in the momentum equations and its work
+``c \rho v \cdot E`` in the energy equation, with the coupling constant
+``c`` = `equations.coupling`. For a charged gas with the charge-to-mass ratio ``q/m`` and
+the permittivity ``\varepsilon_0``, ``c = (q/m)^2 / \varepsilon_0 = \omega_p^2 / \rho_0``
+with the plasma frequency ``\omega_p`` of the background density ``\rho_0`` (see
+[`CompressibleEulerPoissonEquations2D`](@ref)). The potential and the field have no source
+terms; they are set by the solution of the elliptic part of the equations.
 """
 @inline function source_terms_euler_poisson(u, x, t,
                                             equations::CompressibleEulerPoissonEquations2D)
