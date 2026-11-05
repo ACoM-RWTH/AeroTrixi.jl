@@ -122,7 +122,9 @@ end
                                              williamson_condition = false);
                         dt, adaptive = false, save_everystep = false,
                         callback = CallbackSet(callback))
-            return Trixi.wrap_array(sol.u[end], semi)[1, :, :, :]
+            # Copy: indexing the array of `wrap_array` gives a view into `sol.u[end]`,
+            # which is no longer referenced after the return
+            return copy(Trixi.wrap_array(sol.u[end], semi)[1, :, :, :])
         end
         reference = density_at_end(0.1 / 160, true)
         for (stages, order) in ((false, 1), (true, 4))
