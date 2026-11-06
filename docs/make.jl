@@ -16,6 +16,7 @@ makedocs(modules = [AeroTrixi],
                                   canonical = "https://acom-rwth.github.io/AeroTrixi.jl/stable"),
          pages = [
              "Home" => "index.md",
+             "Trixi.jl-Gridap.jl bridge" => "trixi_gridap_bridge.md",
              "API Reference" => "api.md"
          ],
          doctest = true,
