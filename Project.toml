@@ -1,7 +1,7 @@
 name = "AeroTrixi"
 uuid = "96ec6574-3e85-11f1-3b3c-2957db4b7004"
-version = "0.4.1"
-authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko"]
+version = "0.5.0"
+authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko", "Manuel Torrilhon"]
 
 [deps]
 FlowRef = "e2f09e9e-4b11-4a24-9e3f-a1cd38a03ba0"
