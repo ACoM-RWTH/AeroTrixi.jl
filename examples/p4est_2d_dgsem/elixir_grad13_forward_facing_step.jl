@@ -74,10 +74,10 @@ solver = DGSEM(basis, surface_flux, volume_integral)
 #   gmsh -2 -o forward_facing_step.inp forward_facing_step.geo
 #
 # p4est then refines every quadrilateral of the Gmsh mesh uniformly `initial_refinement_level`
-# times: with the default geometry (1/3 to 1/72), level 2 gives elements of 1/12 to 1/288,
-# level 3 of 1/24 to 1/576, and level 4 of 1/48 to 1/1152. The shocks are born at the face of
+# times: with the default geometry (1/3 to 1/72), level 1 gives elements of 1/6 to 1/144,
+# level 2 of 1/12 to 1/288, and level 3 of 1/24 to 1/576. The shocks are born at the face of
 # the step within a few time steps, where the mesh is finest.
-initial_refinement_level = 2
+initial_refinement_level = 1
 geo_file = joinpath(@__DIR__, "forward_facing_step.geo")
 mesh_file = joinpath(@__DIR__, "forward_facing_step.inp")
 if !isfile(mesh_file) ||
@@ -118,29 +118,30 @@ save_solution = SaveSolutionCallback(interval = 500,
                                      save_final_solution = true,
                                      solution_variables = cons2moments)
 
-# Adaptive mesh refinement (not used in this non-adaptive setup): refine where the gas is far
-# from equilibrium, the element maximum of the stress and heat flux relative to the pressure.
-# Note that the levels count from the elements of the Gmsh mesh, which differ in size. To use
-# it, uncomment the following lines and add `amr_callback` to the `CallbackSet` below (before
-# the step size callback).
-# amr_indicator = IndicatorMax(semi, variable = nonequilibrium)
-# amr_controller = ControllerThreeLevel(semi, amr_indicator,
-#                                       base_level = initial_refinement_level,
-#                                       med_level = initial_refinement_level + 1,
-#                                       med_threshold = 0.05,
-#                                       max_level = initial_refinement_level + 2,
-#                                       max_threshold = 0.2)
-# amr_callback = AMRCallback(semi, amr_controller,
-#                            interval = 5,
-#                            adapt_initial_condition = true,
-#                            adapt_initial_condition_only_refine = true)
+# Adaptive mesh refinement: refine where the gas is far from equilibrium, the element maximum
+# of the stress and heat flux relative to the pressure. The levels count from the elements of
+# the Gmsh mesh, which differ in size: level 3 is 1/24 in the far field and 1/576 at the step,
+# so the smallest elements at the step set the time step. With these levels and thresholds,
+# the mesh has about 3000 to 7000 elements up to t = 1 (thresholds of 0.05 and 0.2 give
+# roughly 40 percent fewer); a maximum level of 4 halves the time step and exceeds 10000
+# elements.
+amr_indicator = IndicatorMax(semi, variable = nonequilibrium)
+amr_controller = ControllerThreeLevel(semi, amr_indicator,
+                                      base_level = initial_refinement_level,
+                                      med_level = 2, med_threshold = 0.02,
+                                      max_level = 3, max_threshold = 0.1)
+amr_callback = AMRCallback(semi, amr_controller,
+                           interval = 5,
+                           adapt_initial_condition = true,
+                           adapt_initial_condition_only_refine = true)
 
 # CFL condition of the hyperbolic part; it also has to keep the explicit relaxation stable
-stepsize_callback = StepsizeCallback(cfl = 0.5)
+# (ν Δt is far below 1 here, the small elements at the step set the time step)
+stepsize_callback = StepsizeCallback(cfl = 0.8)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        save_solution,
+                        amr_callback, save_solution,
                         stepsize_callback)
 
 ###############################################################################
