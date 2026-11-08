@@ -82,9 +82,9 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
 
-    @trixi_testset "elixir_grad13_forward_facing_step_amr.jl" begin
+    @trixi_testset "elixir_grad13_forward_facing_step.jl" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                     "elixir_grad13_forward_facing_step_amr.jl"),
+                                     "elixir_grad13_forward_facing_step.jl"),
                             l2=[
                                 0.10033650916679156,
                                 0.132516206581026,
