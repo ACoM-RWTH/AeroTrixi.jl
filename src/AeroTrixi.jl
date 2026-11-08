@@ -31,7 +31,8 @@ using Trixi: @printf, @sprintf,
              P4EST_MAXLEVEL, load_pointerwrapper_tree, unsafe_wrap_sc,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
              nnodes, nelements, get_node_vars, set_node_vars!,
-             DissipationLocalLaxFriedrichs
+             DissipationLocalLaxFriedrichs,
+             get_proposed_dt, set_proposed_dt!
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
@@ -41,7 +42,9 @@ import Trixi: pretty_form_ascii, pretty_form_utf,
               entropy, entropy_math, entropy_thermodynamic,
               ncomponents, eachcomponent,
               flux, flux_ranocha, max_abs_speed, max_abs_speed_naive, max_abs_speeds,
-              boundary_condition_slip_wall, rotate_to_x, rotate_from_x
+              min_max_speed_naive,
+              boundary_condition_slip_wall, rotate_to_x, rotate_from_x,
+              default_analysis_integrals, analyze
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
@@ -56,6 +59,7 @@ include("callbacks_step/callbacks_step.jl")
 include("thermo_models/thermo_models.jl")
 include("equations/equations.jl")
 include("meshes/p4est_mesh_from_vertices.jl")
+include("meshes/p4est_mesh_forward_facing_step.jl")
 include("meshes/lnodes_q2.jl")
 include("meshes/q2_transfer.jl")
 
@@ -78,5 +82,9 @@ export GridapCallback, gridap_stage_update
 export Q2Field, elliptic_fields, elliptic_sources, elliptic_forms, write_elliptic_solution,
        elliptic_spd
 export gridap_q2_function, gridap_node_values
+export Grad13Equations2D, source_terms_grad13, flux_hll_grad13, cons2moments, von_mises_stress,
+       nonequilibrium, collision_frequency, max_collision_frequency, specular_reflection
+export RelaxationStepsizeCallback
+export p4est_mesh_forward_facing_step
 
 end
