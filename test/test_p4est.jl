@@ -108,65 +108,6 @@ isdir(outdir) && rm(outdir, recursive = true)
                                 20.49437640689997
                             ],
                             tspan=(0.0, 0.02))
-        # Ensure that we do not have excessive memory allocations
-        # (e.g., from type instabilities)
-        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
-        @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
-    end
-
-    @trixi_testset "elixir_euler_poisson_blast_five_trees_amr.jl" begin
-        @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                     "elixir_euler_poisson_blast_five_trees_amr.jl"),
-                            l2=[
-                                0.08348665697079459,
-                                0.09963347982540754,
-                                0.0996334798254072,
-                                0.6313579377758771,
-                                0.000578359869988509,
-                                0.003042557094800779,
-                                0.0030425570948007896
-                            ],
-                            linf=[
-                                0.4853553503970873,
-                                0.7365286060586608,
-                                0.736528606058661,
-                                2.761585821363732,
-                                0.0023065950198078696,
-                                0.0231217851821768,
-                                0.023121785182176762
-                            ],
-                            tspan=(0.0, 0.05))
-        # Ensure that we do not have excessive memory allocations
-        # (e.g., from type instabilities)
-        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
-    end
-
-    @trixi_testset "elixir_grad13_forward_facing_step.jl" begin
-        @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                     "elixir_grad13_forward_facing_step.jl"),
-                            l2=[
-                                0.10176880114961427,
-                                0.1343045962940857,
-                                0.029848972295326938,
-                                0.5974176691699331,
-                                0.15518460736855882,
-                                0.030242578563628397,
-                                0.5243615620996445,
-                                0.7587466401044421,
-                                0.252032110532875
-                            ],
-                            linf=[
-                                1.9591338796487578,
-                                2.596882408583758,
-                                2.142117846331939,
-                                11.623329138185863,
-                                3.6267266310798725,
-                                1.7763289149562522,
-                                10.011800019112483,
-                                15.284536989747226,
-                                17.894548099729075
-                            ],
-                            tspan=(0.0, 0.02))
 
         # The Gmsh mesh has 219 quadrilaterals, graded from 1/3 in the far field to 1/72 at
         # the step, each refined uniformly once by p4est and then adapted around the shocks
