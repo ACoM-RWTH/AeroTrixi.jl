@@ -8,4 +8,5 @@
 include("surface_pointwise_callback.jl")
 include("gridap_callback.jl")
 include("relaxation_stepsize_callback.jl")
+include("controller_minimum_size.jl")
 end # @muladd

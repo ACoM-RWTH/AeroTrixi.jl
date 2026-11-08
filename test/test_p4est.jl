@@ -86,32 +86,42 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_grad13_forward_facing_step_amr.jl"),
                             l2=[
-                                0.09691716498004144,
-                                0.12932194444774778,
-                                0.028672645122608347,
-                                0.5757874436368323,
-                                0.1371350860562474,
-                                0.028532719069846408,
-                                0.5117955821433482,
-                                0.7136789329989388,
-                                0.2444057214270061
+                                0.10033650916679156,
+                                0.132516206581026,
+                                0.02892060958229881,
+                                0.5914066233871849,
+                                0.14998173543643642,
+                                0.02849357080187752,
+                                0.520857918542971,
+                                0.7432974325740517,
+                                0.24575078048997068
                             ],
                             linf=[
-                                1.80752858273324,
-                                2.5755908009886204,
-                                1.88389671170425,
-                                11.052414379611907,
-                                3.0333792129405737,
-                                1.5668572264570424,
-                                9.535724773141135,
-                                15.035364701215821,
-                                16.163657465961847
+                                1.9359929668379694,
+                                2.584301798970353,
+                                2.0372987021118867,
+                                11.535792551287326,
+                                3.4669774672360383,
+                                1.6052070611124098,
+                                9.88842951095331,
+                                15.402302609532962,
+                                17.10712934049261
                             ],
                             tspan=(0.0, 0.02))
 
-        # The elements around the face and the corner of the step are refined to the
-        # maximum level from the start, the rest of the mesh follows the shocks
-        @test Trixi.nelements(semi.solver, semi.cache) == 858
+        # The Gmsh mesh has 564 quadrilaterals, graded from 1/12 to about 1/96 at the step;
+        # the AMR refines the elements around the shocks forming at the face of the step
+        @test Trixi.ntrees(mesh) == 564
+        @test Trixi.nelements(semi.solver, semi.cache) == 999
+
+        # The refinement is bounded by the minimum element size: no element is smaller than
+        # about half of `h_min` (the children of elements just above `h_min`)
+        let sizes = [AeroTrixi.element_size(element, mesh, equations, semi.solver,
+                                            semi.cache)
+                     for element in 1:Trixi.nelements(semi.solver, semi.cache)]
+            @test minimum(sizes) > 0.5 * amr_controller.h_min
+            @test maximum(sizes) < 0.11
+        end
 
         # The solution stays in the physical range: positive density and pressure, and
         # the reflected shock does not exceed the Rankine-Hugoniot density ratio (3 for the

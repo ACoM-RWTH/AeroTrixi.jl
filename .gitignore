@@ -5,3 +5,6 @@ Manifest.toml
 *.inp
 *.h5
 
+
+# the committed Gmsh mesh of the forward-facing step example
+!examples/p4est_2d_dgsem/forward_facing_step.inp
