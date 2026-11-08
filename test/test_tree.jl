@@ -91,6 +91,50 @@ isdir(outdir) && rm(outdir, recursive = true)
         # (e.g., from type instabilities)
         @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
+
+    @trixi_testset "elixir_grad13_riemann2d.jl" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_grad13_riemann2d.jl"),
+                            l2=[
+                                0.3951071897965176,
+                                0.2400443360815346,
+                                0.24004433608153464,
+                                0.6870610746650073,
+                                0.4635301700056846,
+                                0.05017599179899899,
+                                0.4635301700056846,
+                                0.586372720638695,
+                                0.5863727206386952
+                            ],
+                            linf=[
+                                2.4242096990831277,
+                                1.458697080578109,
+                                1.458697080578109,
+                                3.8246667202791547,
+                                2.7612995842361294,
+                                0.3249449986440117,
+                                2.761299584236129,
+                                3.2872714905808618,
+                                3.287271490580861
+                            ],
+                            tspan=(0.0, 0.05))
+
+        # The time step is limited by the stiffness of the collision terms, ν Δt ≤ 1 with
+        # the collision frequency ν = ρ √θ / Kn ≈ 5000 of the dense gas, which is far below
+        # the CFL time step on this mesh
+        let u = Trixi.wrap_array(sol.u[end], semi)
+            nu_max = max_collision_frequency(u, semi.mesh, semi.equations, semi.solver,
+                                             semi.cache)
+            @test nu_max ≈ 5 * sqrt(1.0) / equations.Kn rtol=1e-2
+            dt_cfl = Trixi.calculate_dt(sol.u[end], sol.t[end], Returns(0.5), Returns(0.0),
+                                        semi)
+            @test 1 / nu_max < 0.5 * dt_cfl
+        end
+
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+    end
 end
 
 end # module

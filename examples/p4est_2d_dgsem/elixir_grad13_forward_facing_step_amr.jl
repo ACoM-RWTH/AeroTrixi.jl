@@ -94,15 +94,16 @@ save_solution = SaveSolutionCallback(interval = 500,
 
 # Refine where the gas is far from equilibrium: the element maximum of the stress and heat
 # flux relative to the pressure. In addition, the elements within the distance `step_distance`
-# of the step are always refined to the maximum level: the shocks are born at the face of the
-# step, where the inflow is stopped within a few time steps, and the corner expansion is
-# singular. Refining an element only after such a front has formed inside it projects the
+# of the face and the corner of the step are always refined to the maximum level: the shocks
+# are born at the face of the step, where the inflow is stopped within a few time steps, and
+# the corner expansion is singular. Refining an element only after such a front has formed inside it projects the
 # front onto children elements with negative mean pressure. Level 5 gives elements of size 1/96.
 """
     IndicatorNonequilibriumStep(semi; step_distance, step_value)
 
 AMR indicator of the forward-facing step: the `IndicatorMax` of [`nonequilibrium`](@ref), raised
-to at least `step_value` in the elements whose center lies within `step_distance` of the step.
+to at least `step_value` in the elements whose center lies within `step_distance` of the face or
+the corner of the step.
 """
 struct IndicatorNonequilibriumStep{Indicator, RealT, Cache} <: Trixi.AbstractIndicator
     indicator     :: Indicator
@@ -117,9 +118,14 @@ function IndicatorNonequilibriumStep(semi; step_distance, step_value)
                                        (; alpha = indicator.cache.alpha))
 end
 
-# distance of `x` from the step [1, 3] × [0, 1/3]
+# distance of `x` from the face of the step (the segment x = 1, 0 ≤ y ≤ 1/3) and from its
+# corner (1, 1/3)
 function distance_to_step(x)
-    return sqrt(max(1 - x[1], 0)^2 + max(x[2] - 1 / 3, 0)^2)
+    if x[1] <= 1
+        return sqrt((1 - x[1])^2 + max(x[2] - 1 / 3, 0)^2)
+    else
+        return sqrt((x[1] - 1)^2 + (x[2] - 1 / 3)^2)
+    end
 end
 
 function (indicator::IndicatorNonequilibriumStep)(u, mesh, equations, dg, cache; kwargs...)
