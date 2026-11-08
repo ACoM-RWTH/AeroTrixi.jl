@@ -17,9 +17,11 @@ using AeroTrixi
 # the shear layers of the moment solution and converges once their inner structure is resolved.
 #
 # The collision terms are explicit source terms. They relax the stress with the collision
-# frequency ν = ρ √θ / Kn, so the time step is limited by ν Δt ≲ 1 in addition to the CFL
-# condition; the `RelaxationStepsizeCallback` enforces this. At Kn = 0.001 this limit is
-# dominant on the coarse base level, at Kn = 0.005 both limits are comparable.
+# frequency ν = ρ √θ / Kn (about 1200 behind the shock at Kn = 0.005), so the time step has to
+# keep ν Δt below the real-axis stability limit of the Runge-Kutta method (about 2.5) in
+# addition to the CFL condition. The time step is controlled by the CFL number alone; the
+# analysis output prints the maximum of ν to judge ν Δt. On the mesh below, the CFL time step
+# keeps ν Δt well below 1; smaller Knudsen numbers or coarser meshes need a smaller CFL number.
 
 Kn = 0.005
 equations = Grad13Equations2D(Kn)
@@ -135,14 +137,13 @@ save_solution = SaveSolutionCallback(interval = 500,
 #                            adapt_initial_condition = true,
 #                            adapt_initial_condition_only_refine = true)
 
-# CFL condition of the hyperbolic part, then the stability limit of the explicit relaxation
+# CFL condition of the hyperbolic part; it also has to keep the explicit relaxation stable
 stepsize_callback = StepsizeCallback(cfl = 0.5)
-relaxation_stepsize_callback = RelaxationStepsizeCallback(nu_dt_max = 1.0)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution,
-                        stepsize_callback, relaxation_stepsize_callback)
+                        stepsize_callback)
 
 ###############################################################################
 # run the simulation
@@ -156,5 +157,5 @@ stage_limiter! = PositivityPreservingLimiterZhangShu(thresholds = (1.0e-6, 1.0e-
                                                                   Trixi.pressure))
 
 sol = solve(ode, CarpenterKennedy2N54(; stage_limiter!, williamson_condition = false);
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize callbacks
+            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize callback
             ode_default_options()..., callback = callbacks);

@@ -32,7 +32,6 @@ using Trixi: @printf, @sprintf,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
              nnodes, nelements, get_node_vars, set_node_vars!,
              DissipationLocalLaxFriedrichs,
-             get_proposed_dt, set_proposed_dt!,
              get_inverse_jacobian, summary_header, summary_footer, summary_line,
              increment_indent
 
@@ -87,6 +86,6 @@ export gridap_q2_function, gridap_node_values
 export Grad13Equations2D, source_terms_grad13, flux_hll_grad13, cons2moments,
        von_mises_stress,
        nonequilibrium, collision_frequency, max_collision_frequency, specular_reflection
-export RelaxationStepsizeCallback, ControllerMinimumSize
+export ControllerMinimumSize
 
 end

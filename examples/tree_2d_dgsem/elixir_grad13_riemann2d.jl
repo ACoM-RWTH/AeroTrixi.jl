@@ -11,8 +11,10 @@ using AeroTrixi
 # discretization: the domain [-1, 1]² is open at the left and right and bounded by specular
 # walls at the bottom and top.
 #
-# The collision terms are explicit source terms; the `RelaxationStepsizeCallback` keeps
-# ν Δt bounded, which is the dominant time step restriction at Kn = 0.001 on this mesh.
+# The collision terms are explicit source terms. At Kn = 0.001, the collision frequency
+# ν = ρ √θ / Kn reaches 5000 in the dense gas, and the explicit relaxation needs ν Δt below the
+# real-axis stability limit of the Runge-Kutta method (about 2.5). On this mesh, this is the
+# dominant time step restriction, so the CFL number is reduced to 0.1 (ν Δt ≈ 1.7).
 
 Kn = 0.001
 equations = Grad13Equations2D(Kn)
@@ -79,17 +81,17 @@ save_solution = SaveSolutionCallback(interval = 200,
                                      save_final_solution = true,
                                      solution_variables = cons2moments)
 
-stepsize_callback = StepsizeCallback(cfl = 0.5)
-relaxation_stepsize_callback = RelaxationStepsizeCallback(nu_dt_max = 1.0)
+# The CFL number is chosen for the stability of the explicit relaxation (see above)
+stepsize_callback = StepsizeCallback(cfl = 0.1)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
                         save_solution,
-                        stepsize_callback, relaxation_stepsize_callback)
+                        stepsize_callback)
 
 ###############################################################################
 # run the simulation
 
 sol = solve(ode, CarpenterKennedy2N54(williamson_condition = false);
-            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize callbacks
+            dt = 1.0, # solve needs some value here but it will be overwritten by the stepsize callback
             ode_default_options()..., callback = callbacks);

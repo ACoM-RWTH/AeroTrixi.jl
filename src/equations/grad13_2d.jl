@@ -245,8 +245,10 @@ terms: the stress relaxes as ``-\\nu \\sigma_{ij}`` and the heat flux as
 also receive the work of the stress relaxation, ``-\\nu \\sigma_{ij} v_j``.
 
 The relaxation is stiff for small Knudsen numbers: an explicit time integration needs
-``\\nu \\Delta t`` below the real-axis stability limit of the Runge-Kutta method, which can be
-enforced with the [`RelaxationStepsizeCallback`](@ref).
+``\\nu \\Delta t`` below the real-axis stability limit of the Runge-Kutta method (about 2.5 for
+the third-order SSP method and the five-stage fourth-order Carpenter-Kennedy method), which is
+controlled through the CFL number of the `StepsizeCallback`; [`max_collision_frequency`](@ref)
+reports ``\\nu_\\max`` in the analysis output.
 """
 @inline function source_terms_grad13(u, x, t, equations::Grad13Equations2D)
     rho, v1, v2, theta, T11, T12, T22, q1, q2 = cons2prim(u, equations)
@@ -590,7 +592,7 @@ end
 Maximum of the [`collision_frequency`](@ref) over all nodes of the DG solution `u`. Can be
 passed as `extra_analysis_integrals = (max_collision_frequency,)` to the `AnalysisCallback`;
 together with the time step it shows the stiffness ``\\nu \\Delta t`` of the explicit source
-terms.
+terms, which the CFL number has to keep below the stability limit of the time integration.
 """
 function max_collision_frequency(u, mesh, equations::Grad13Equations2D, dg, cache)
     nu_max = zero(real(dg))
