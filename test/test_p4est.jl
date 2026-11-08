@@ -115,11 +115,12 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test Trixi.nelements(semi.solver, semi.cache) == 999
 
         # The refinement is bounded by the minimum element size: no element is smaller than
-        # about half of `h_min` (the children of elements just above `h_min`)
+        # about half of `h_min` (the children of elements just above `h_min`, and of smaller
+        # elements refined by the 2:1 balance of the forest)
         let sizes = [AeroTrixi.element_size(element, mesh, equations, semi.solver,
                                             semi.cache)
                      for element in 1:Trixi.nelements(semi.solver, semi.cache)]
-            @test minimum(sizes) > 0.5 * amr_controller.h_min
+            @test minimum(sizes) > 0.4 * amr_controller.h_min
             @test maximum(sizes) < 0.11
         end
 

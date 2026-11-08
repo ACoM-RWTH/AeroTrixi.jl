@@ -40,11 +40,6 @@ function initial_condition_forward_facing_step(x, t, equations::Grad13Equations2
 end
 initial_condition = initial_condition_forward_facing_step
 
-# Supersonic inflow by prescribing the full state, open outflow, specular walls
-boundary_conditions = (; inflow = BoundaryConditionDirichlet(initial_condition),
-                       outflow = boundary_condition_do_nothing,
-                       wall = boundary_condition_slip_wall)
-
 # Lax-Friedrichs flux with the crude wave-speed bounds of the finite-volume solver. The shock
 # in front of the step is a reflected shock with a relative Mach number of 3, far beyond the
 # critical Mach number of Grad13, so that the moment equations are not hyperbolic inside the
@@ -78,14 +73,20 @@ solver = DGSEM(basis, surface_flux, volume_integral)
 #
 #   gmsh -setnumber meshSize 0.08333 -setnumber refinement 8 -2 -o forward_facing_step.inp forward_facing_step.geo
 #
-# The boundary names are the physical lines of the geometry.
+# The boundary names are the labels of the physical lines of the geometry.
 mesh_file = joinpath(@__DIR__, "forward_facing_step.inp")
 if !isfile(mesh_file)
     geo_file = joinpath(@__DIR__, "forward_facing_step.geo")
     run(`gmsh -setnumber meshSize 0.08333 -setnumber refinement 8 -2 -o $mesh_file $geo_file`)
 end
 mesh = P4estMesh{2}(mesh_file, polydeg = polydeg,
-                    boundary_symbols = [:inflow, :outflow, :wall])
+                    boundary_symbols = [:PhysicalLine1, :PhysicalLine2, :PhysicalLine3])
+
+# Supersonic inflow by prescribing the full state, open outflow, specular walls, assigned to
+# the physical lines of the Gmsh geometry by their labels
+boundary_conditions = (; PhysicalLine1 = BoundaryConditionDirichlet(initial_condition), # inflow (x = 0)
+                       PhysicalLine2 = boundary_condition_do_nothing, # outflow (x = 3)
+                       PhysicalLine3 = boundary_condition_slip_wall) # walls and step
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions,

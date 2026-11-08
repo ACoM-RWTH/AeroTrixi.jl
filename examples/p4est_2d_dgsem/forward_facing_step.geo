@@ -11,8 +11,9 @@
 //
 //   gmsh -setnumber meshSize 0.0833 -setnumber refinement 8 -2 -o forward_facing_step.inp forward_facing_step.geo
 //
-// The boundary parts are the physical lines `inflow` (x = 0), `outflow` (x = 3), and `wall`
-// (bottom, top, and the two faces of the step).
+// The boundary parts are the physical lines 1 (inflow, x = 0), 2 (outflow, x = 3), and 3
+// (walls: bottom, top, and the two faces of the step); Gmsh names their node sets
+// `PhysicalLine1`, `PhysicalLine2`, `PhysicalLine3`, which Trixi.jl uses as boundary names.
 
 // command line parameters (gmsh -setnumber <name> <value>)
 If(!Exists(meshSize))
@@ -68,7 +69,9 @@ Line Loop(1) = {1, 2, 3, 4, 5, 6, 7, 8};
 Plane Surface(1) = {1};
 Point{9, 10, 11, 12} In Surface{1};
 
-Physical Line("inflow") = {8};
-Physical Line("outflow") = {6};
-Physical Line("wall") = {1, 2, 3, 4, 5, 7};
-Physical Surface("domain") = {1};
+// labeling of the boundary parts
+Physical Line(1) = {8};                 // inflow
+Physical Line(2) = {6};                 // outflow
+Physical Line(3) = {1, 2, 3, 4, 5, 7};  // walls: bottom, face and top of the step, top
+
+Physical Surface(4) = {1};
