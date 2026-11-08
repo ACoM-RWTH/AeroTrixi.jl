@@ -113,13 +113,6 @@ isdir(outdir) && rm(outdir, recursive = true)
         # the step, each refined uniformly twice by p4est; the mesh is not adapted
         @test Trixi.ntrees(mesh) == 219
         @test Trixi.nelements(semi.solver, semi.cache) == 3504
-        let sizes = [AeroTrixi.element_size(element, mesh, equations, semi.solver,
-                                            semi.cache)
-                     for element in 1:Trixi.nelements(semi.solver, semi.cache)]
-            @test 1 / 300 < minimum(sizes) < 1 / 250
-            @test 1 / 14 < maximum(sizes) < 1 / 10
-        end
-
         # The solution stays in the physical range: positive density and pressure, and
         # the reflected shock does not exceed the Rankine-Hugoniot density ratio (3 for the
         # relative Mach number 3) by more than the overshoot of the moment shock structure

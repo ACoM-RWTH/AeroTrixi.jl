@@ -120,18 +120,16 @@ save_solution = SaveSolutionCallback(interval = 500,
 
 # Adaptive mesh refinement (not used in this non-adaptive setup): refine where the gas is far
 # from equilibrium, the element maximum of the stress and heat flux relative to the pressure.
-# The levels count from the elements of the Gmsh mesh, so `ControllerMinimumSize` stops the
-# refinement at a minimum element size everywhere, in particular in the already fine elements
-# at the step. To use it, uncomment the following lines and add `amr_callback` to the
-# `CallbackSet` below (before the step size callbacks).
+# Note that the levels count from the elements of the Gmsh mesh, which differ in size. To use
+# it, uncomment the following lines and add `amr_callback` to the `CallbackSet` below (before
+# the step size callback).
 # amr_indicator = IndicatorMax(semi, variable = nonequilibrium)
-# amr_controller = ControllerMinimumSize(ControllerThreeLevel(semi, amr_indicator,
-#                                                             base_level = initial_refinement_level,
-#                                                             med_level = initial_refinement_level + 1,
-#                                                             med_threshold = 0.05,
-#                                                             max_level = initial_refinement_level + 2,
-#                                                             max_threshold = 0.2);
-#                                        h_min = 1.05 / 288)
+# amr_controller = ControllerThreeLevel(semi, amr_indicator,
+#                                       base_level = initial_refinement_level,
+#                                       med_level = initial_refinement_level + 1,
+#                                       med_threshold = 0.05,
+#                                       max_level = initial_refinement_level + 2,
+#                                       max_threshold = 0.2)
 # amr_callback = AMRCallback(semi, amr_controller,
 #                            interval = 5,
 #                            adapt_initial_condition = true,

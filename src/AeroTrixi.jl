@@ -31,9 +31,7 @@ using Trixi: @printf, @sprintf,
              P4EST_MAXLEVEL, load_pointerwrapper_tree, unsafe_wrap_sc,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
              nnodes, nelements, get_node_vars, set_node_vars!,
-             DissipationLocalLaxFriedrichs,
-             get_inverse_jacobian, summary_header, summary_footer, summary_line,
-             increment_indent
+             DissipationLocalLaxFriedrichs
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
@@ -45,8 +43,7 @@ import Trixi: pretty_form_ascii, pretty_form_utf,
               flux, flux_ranocha, max_abs_speed, max_abs_speed_naive, max_abs_speeds,
               min_max_speed_naive,
               boundary_condition_slip_wall, rotate_to_x, rotate_from_x,
-              default_analysis_integrals, analyze,
-              get_element_variables!, max_level
+              default_analysis_integrals, analyze
 
 #viscous_stress_tensor # 3D version not in main Trixi.jl, but also currently not used
 
@@ -86,6 +83,5 @@ export gridap_q2_function, gridap_node_values
 export Grad13Equations2D, source_terms_grad13, flux_hll_grad13, cons2moments,
        von_mises_stress,
        nonequilibrium, collision_frequency, max_collision_frequency, specular_reflection
-export ControllerMinimumSize
 
 end
