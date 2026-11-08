@@ -117,7 +117,7 @@ isdir(outdir) && rm(outdir, recursive = true)
         # the reflected shock does not exceed the Rankine-Hugoniot density ratio (3 for the
         # relative Mach number 3) by more than the overshoot of the moment shock structure
         let u = Trixi.wrap_array(sol.u[end], semi)
-            rho = @view u[1, :, :, :]
+            rho = Array(u[1, :, :, :])
             @test minimum(rho) > 0
             @test maximum(rho) < 4
             p_min = minimum(Trixi.pressure(Trixi.get_node_vars(u, equations, semi.solver, i,
