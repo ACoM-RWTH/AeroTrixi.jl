@@ -119,7 +119,8 @@ const mirrorA_x = SVector(1.3, -0.91, -0.52, 2.5675, 2.327, 0.169, 1.443, -3.102
         @test flux_hll_grad13(consB, consA, SVector(-1.0, 0.0), equations)≈-hllAB_x rtol=1e-12
         # at the stationary sonic state (normal speed equal to the wave-speed bound), the wall
         # flux of the mirrored Riemann problem carries no mass; `FluxHLL` lets the gas out
-        u_sonic = prim2cons(SVector(1.0, 2 * sqrt(5 / 3), 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0),
+        u_sonic = prim2cons(SVector(1.0, 2 * sqrt(5 / 3), 0.0, 1.0, 1.0, 0.0, 1.0, 0.0,
+                                    0.0),
                             equations)
         u_mirror = specular_reflection(u_sonic, SVector(1.0, 0.0), equations)
         @test all(Trixi.min_max_speed_naive(u_sonic, u_mirror, 1, equations) .== 0)

@@ -9,8 +9,8 @@ using AeroTrixi
 # a step of height 1/3 at x = 1, an inflow with density 1, temperature 1 and velocity
 # 2 √(5/3) (Mach 2 with respect to the Euler sound speed √(5/3 θ)), and specular walls.
 #
-# The DG discretization uses the HLL flux with the wave-speed bounds of the finite-volume
-# solver, shock capturing by blending with a subcell finite-volume scheme, and adaptive mesh
+# The DG discretization uses the Lax-Friedrichs flux with the wave-speed bounds of the
+# finite-volume solver, shock capturing by blending with a subcell finite-volume scheme, and adaptive mesh
 # refinement driven by the local deviation from equilibrium, `nonequilibrium`: the stress and
 # the heat flux relative to the pressure. This measure is of the order of the Knudsen number in
 # smooth flow and of order one in the shock layers, so the refinement follows the shocks and
@@ -45,13 +45,16 @@ boundary_conditions = (; inflow = BoundaryConditionDirichlet(initial_condition),
                        outflow = boundary_condition_do_nothing,
                        wall = boundary_condition_slip_wall)
 
-# HLL flux with the crude wave-speed bounds of the finite-volume solver (with the central flux
-# at the stationary sonic state at the step face, where the inflow hits the wall exactly at the
-# wave-speed bound; Trixi's `FluxHLL` would let the gas flow out through the wall). There is no
-# entropy-conservative two-point flux for Grad13, so the DG volume integral uses the central
-# flux (standard DGSEM) and is blended with the subcell finite-volume HLL scheme in troubled
-# elements.
-surface_flux = flux_hll_grad13
+# Lax-Friedrichs flux with the crude wave-speed bounds of the finite-volume solver. The shock
+# in front of the step is a reflected shock with a relative Mach number of 3, far beyond the
+# critical Mach number of Grad13, so that the moment equations are not hyperbolic inside the
+# shock layer. With the less dissipative HLL flux (`flux_hll_grad13`), a density spike grows at
+# the head of the shock and the run breaks down; the additional dissipation of the
+# Lax-Friedrichs flux keeps the shock layer at the values of the finite-volume solution. There
+# is no entropy-conservative two-point flux for Grad13, so the DG volume integral uses the
+# central flux (standard DGSEM) and is blended with the subcell finite-volume scheme in
+# troubled elements.
+surface_flux = flux_lax_friedrichs
 volume_flux = flux_central
 polydeg = 2
 basis = LobattoLegendreBasis(polydeg)

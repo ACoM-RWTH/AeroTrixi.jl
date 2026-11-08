@@ -125,7 +125,7 @@ isdir(outdir) && rm(outdir, recursive = true)
         let u = Trixi.wrap_array(sol.u[end], semi)
             nu_max = max_collision_frequency(u, semi.mesh, semi.equations, semi.solver,
                                              semi.cache)
-            @test nu_max ≈ 5 * sqrt(1.0) / equations.Kn rtol=1e-2
+            @test nu_max≈5 * sqrt(1.0) / equations.Kn rtol=1e-2
             dt_cfl = Trixi.calculate_dt(sol.u[end], sol.t[end], Returns(0.5), Returns(0.0),
                                         semi)
             @test 1 / nu_max < 0.5 * dt_cfl
