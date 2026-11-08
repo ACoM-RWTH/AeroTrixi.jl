@@ -1001,7 +1001,8 @@ preserves entropy stability based on the analysis in the paper:
   Stability of wall boundary condition procedures for discontinuous Galerkin spectral element approximations of the compressible Euler equations
   [DOI: 10.1007/978-3-030-39647-3_1](https://doi.org/10.1007/978-3-030-39647-3_1)
 
-Should be used together with [`UnstructuredMesh2D`](@ref), [`P4estMesh`](@ref), or [`T8codeMesh`](@ref).
+Should be used together with [`UnstructuredMesh2D`](@extref Trixi.UnstructuredMesh2D),
+[`P4estMesh`](@extref Trixi.P4estMesh), or [`T8codeMesh`](@extref Trixi.T8codeMesh).
 """
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
                                               x, t,
@@ -1055,7 +1056,7 @@ end
     boundary_condition_slip_wall(u_inner, orientation, direction, x, t,
                                     surface_flux_function, equations::CompressibleEulerEquationsMs1T2D)
 
-Should be used together with [`TreeMesh`](@ref).
+Should be used together with [`TreeMesh`](@extref Trixi.TreeMesh).
 """
 @inline function boundary_condition_slip_wall(u_inner, orientation,
                                               direction, x, t,
@@ -1078,7 +1079,7 @@ end
     boundary_condition_slip_wall(u_inner, normal_direction, direction, x, t,
                                     surface_flux_function, equations::CompressibleEulerEquationsMs1T2D)
 
-Should be used together with [`StructuredMesh`](@ref).
+Should be used together with [`StructuredMesh`](@extref Trixi.StructuredMesh).
 """
 @inline function boundary_condition_slip_wall(u_inner, normal_direction::AbstractVector,
                                               direction, x, t,

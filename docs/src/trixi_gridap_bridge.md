@@ -1,6 +1,6 @@
 # Trixi.jl–Gridap.jl bridge
 
-The bridge couples the discontinuous Galerkin (DG) solver of [Trixi.jl](https://github.com/trixi-framework/Trixi.jl) with continuous finite elements of [Gridap.jl](https://github.com/gridap/Gridap.jl) on the *same*, adaptively refined `P4estMesh`. A typical use is a hyperbolic system that is coupled to an elliptic equation, for example the Euler equations with an electrostatic potential: in each time step (or in each Runge-Kutta stage), a source is taken from the DG solution, a finite element problem is solved with Gridap.jl, and the result is written back into the DG solution, where it enters the source terms of the flow.
+The bridge of AeroTrixi.jl couples the discontinuous Galerkin (DG) solver of [Trixi.jl](https://github.com/trixi-framework/Trixi.jl) with continuous finite elements of [Gridap.jl](https://github.com/gridap/Gridap.jl) on the *same*, adaptively refined `P4estMesh`. A typical use is a hyperbolic system that is coupled to an elliptic equation, for example the Euler equations with an electrostatic potential: in each time step (or in each Runge-Kutta stage), a source is taken from the DG solution, a finite element problem is solved with Gridap.jl, and the result is written back into the DG solution, where it enters the source terms of the flow.
 
 Gridap.jl assembles the finite element problems from their weak form, so that other problems than the Poisson problem of the example (systems, other operators, other boundary conditions) can be set up with little effort. The bridge itself only provides the mesh, the node numbering with hanging-node constraints, the data transfer, and a callback for the time integration.
 
@@ -10,7 +10,7 @@ The bridge currently covers:
 
 -   2D, `P4estMesh` with adaptive refinement, DG with polynomial degree 2 and continuous Q2 elements on the same nodes; serial runs only.
 -   Meshes with the full connectivity between trees, including corners.
--   An elliptic part of the equations with scalar Q2 field2.
+-   An elliptic part of the equations with a single scalar Q2 field.
 -   Linear elliptic problems with homogeneous Dirichlet conditions, whose linear form is affine in the sources taken from the DG solution.
 -   For the full order in time, a time integration method with `stage_limiter!` (SSPRK and low-storage Runge-Kutta methods of OrdinaryDiffEq.jl); with other methods, the elliptic problem can only be solved once per time step (first order in time).
 
