@@ -81,6 +81,55 @@ isdir(outdir) && rm(outdir, recursive = true)
         # (e.g., from type instabilities)
         @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
+
+    @trixi_testset "elixir_grad13_forward_facing_step_amr.jl" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_grad13_forward_facing_step_amr.jl"),
+                            l2=[
+                                0.09691716498004144,
+                                0.12932194444774778,
+                                0.028672645122608347,
+                                0.5757874436368323,
+                                0.1371350860562474,
+                                0.028532719069846408,
+                                0.5117955821433482,
+                                0.7136789329989388,
+                                0.2444057214270061
+                            ],
+                            linf=[
+                                1.80752858273324,
+                                2.5755908009886204,
+                                1.88389671170425,
+                                11.052414379611907,
+                                3.0333792129405737,
+                                1.5668572264570424,
+                                9.535724773141135,
+                                15.035364701215821,
+                                16.163657465961847
+                            ],
+                            tspan=(0.0, 0.02))
+
+        # The elements around the face and the corner of the step are refined to the
+        # maximum level from the start, the rest of the mesh follows the shocks
+        @test Trixi.nelements(semi.solver, semi.cache) == 858
+
+        # The solution stays in the physical range: positive density and pressure, and
+        # the reflected shock does not exceed the Rankine-Hugoniot density ratio (3 for the
+        # relative Mach number 3) by more than the overshoot of the moment shock structure
+        let u = Trixi.wrap_array(sol.u[end], semi)
+            rho = @view u[1, :, :, :]
+            @test minimum(rho) > 0
+            @test maximum(rho) < 4
+            p_min = minimum(Trixi.pressure(Trixi.get_node_vars(u, equations, semi.solver, i,
+                                                               j, element), equations)
+                            for i in 1:3, j in 1:3, element in 1:size(u, 4))
+            @test p_min > 0
+        end
+
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+    end
 end
 
 end # module
