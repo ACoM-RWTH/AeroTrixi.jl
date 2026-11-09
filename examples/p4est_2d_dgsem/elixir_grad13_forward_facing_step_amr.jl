@@ -104,7 +104,10 @@ save_solution = SaveSolutionCallback(interval = 500,
 # the corner expansion is singular. Refining an element only after such a front has formed
 # inside it projects the front onto children elements with negative mean pressure. Level 6
 # gives elements of size 1/192 (node spacing 1/384, as the 1/360 cells of the finite-volume
-# reference); the shock layers at Kn = 0.001 are a few 1/100 wide.
+# reference); the shock layers at Kn = 0.001 are a few 1/100 wide. The low thresholds also
+# refine the reflected shock and the shear layer from the corner, which are weaker than the
+# bow shock; with 0.02 and 0.1 they stay at the medium level, where the numerical dissipation
+# smears them. The mesh grows to about 14000 elements at t = 1.
 """
     IndicatorNonequilibriumStep(semi; step_distance, step_value)
 
@@ -155,8 +158,8 @@ end
 amr_indicator = IndicatorNonequilibriumStep(semi; step_distance = 0.1, step_value = 1.0)
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 2,
-                                      med_level = 4, med_threshold = 0.02,
-                                      max_level = 6, max_threshold = 0.1)
+                                      med_level = 4, med_threshold = 0.005,
+                                      max_level = 6, max_threshold = 0.03)
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 5,
                            adapt_initial_condition = true,
