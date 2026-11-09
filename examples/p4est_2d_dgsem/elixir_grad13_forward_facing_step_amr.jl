@@ -47,10 +47,19 @@ initial_condition = initial_condition_forward_facing_step
 # critical Mach number of Grad13, so that the moment equations are not hyperbolic inside the
 # shock layer. With the less dissipative HLL flux (`flux_hll_grad13`), a density spike grows at
 # the head of the shock and the run breaks down; the additional dissipation of the
-# Lax-Friedrichs flux keeps the shock layer at the values of the finite-volume solution. There
-# is no entropy-conservative two-point flux for Grad13, so the DG volume integral uses the
-# central flux (standard DGSEM) and is blended with the subcell finite-volume scheme in
-# troubled elements.
+# Lax-Friedrichs flux keeps the shock layer at the values of the finite-volume solution.
+#
+# Shock capturing: there is no entropy-conservative two-point flux for Grad13, so the DG volume
+# integral uses the central flux (standard DGSEM), and troubled elements (Hennemann-Gassner
+# indicator) are blended with a second-order subcell finite-volume scheme on the LGL subcells
+# with slopes in the primitive variables limited by the van Leer limiter, the counterpart of the
+# MUSCL scheme of the finite-volume solver (Rueda-Ramírez et al.). The first-order blending
+# `VolumeIntegralShockCapturingHG` is more robust but smears the reflected shock and the shear
+# layer; the pure DG method (`VolumeIntegralWeakForm`) breaks down in the shock layers. The
+# limited subcell scheme alone, without the DG part, is the finite-volume solver on the subcells:
+#   volume_integral = VolumeIntegralPureLGLFiniteVolumeO2(basis; volume_flux_fv = surface_flux,
+#                                                         reconstruction_mode = reconstruction_O2_full,
+#                                                         slope_limiter = vanleer)
 surface_flux = flux_lax_friedrichs
 volume_flux = flux_central
 polydeg = 2
@@ -60,9 +69,12 @@ indicator_sc = IndicatorHennemannGassner(equations, basis,
                                          alpha_min = 0.001,
                                          alpha_smooth = true,
                                          variable = density_pressure)
-volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
-                                                 volume_flux_dg = volume_flux,
-                                                 volume_flux_fv = surface_flux)
+volume_integral = VolumeIntegralShockCapturingRRG(basis, indicator_sc;
+                                                  volume_flux_dg = volume_flux,
+                                                  volume_flux_fv = surface_flux,
+                                                  slope_limiter = vanleer,
+                                                  cons2recon = cons2prim,
+                                                  recon2cons = prim2cons)
 solver = DGSEM(basis, surface_flux, volume_integral)
 
 # 21 square trees of side 1/3; level 2 gives elements of size 1/12
