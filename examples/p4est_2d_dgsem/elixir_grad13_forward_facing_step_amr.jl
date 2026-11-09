@@ -50,8 +50,8 @@ initial_condition = initial_condition_forward_facing_step
 # Lax-Friedrichs flux keeps the shock layer at the values of the finite-volume solution.
 #
 # Shock capturing: there is no entropy-conservative two-point flux for Grad13, so the DG volume
-# integral uses the central flux (standard DGSEM), and troubled elements (Hennemann-Gassner
-# indicator) are blended with a second-order subcell finite-volume scheme on the LGL subcells
+# integral uses the central flux (standard DGSEM), and troubled elements (the non-equilibrium
+# indicator below) are blended with a second-order subcell finite-volume scheme on the LGL subcells
 # with slopes in the primitive variables limited by the van Leer limiter, the counterpart of the
 # MUSCL scheme of the finite-volume solver (Rueda-Ramírez et al.). The first-order blending
 # `VolumeIntegralShockCapturingHG` is more robust but smears the reflected shock and the shear
@@ -64,11 +64,50 @@ surface_flux = flux_lax_friedrichs
 volume_flux = flux_central
 polydeg = 2
 basis = LobattoLegendreBasis(polydeg)
-indicator_sc = IndicatorHennemannGassner(equations, basis,
-                                         alpha_max = 0.5,
-                                         alpha_min = 0.001,
-                                         alpha_smooth = true,
-                                         variable = density_pressure)
+# Shock-capturing indicator from the non-equilibrium measure instead of the modal energy of
+# the Hennemann-Gassner indicator: the element maximum of `nonequilibrium` is mapped linearly
+# onto [0, alpha_max] between `lo` (pure DG below) and `hi` (alpha_max above). The blending
+# then follows the physics of the moment equations: Grad13 loses its real characteristic
+# speeds where the measure reaches about 0.6 (heat flux 0.64 p √θ or compressive stress
+# 0.8 p in one dimension), and the shock layers of this case reach 0.4 to 0.9, while the
+# expansion around the corner and the shear layer stay below 0.25 and the smooth flow below
+# 0.03 at Kn = 0.001. With `lo = 0.1` and `hi = 0.3`, the shock layers get the full blending,
+# their tails and the shear layer a partial one, and about a quarter of the elements are
+# blended at all, compared with half for the Hennemann-Gassner indicator with
+# `density_pressure`, at the same solution. The thresholds are absolute values of the
+# measure; for other Knudsen numbers, the smooth-flow level scales with Kn.
+struct IndicatorNonequilibriumBlending{RealT, Indicator, Cache} <: Trixi.AbstractIndicator
+    alpha_max    :: RealT
+    lo           :: RealT
+    hi           :: RealT
+    alpha_smooth :: Bool
+    indicator    :: Indicator # IndicatorMax of `nonequilibrium`
+    cache        :: Cache     # its `alpha` (saved as element variable) and a work array
+end
+
+function IndicatorNonequilibriumBlending(equations, basis; alpha_max = 0.5, lo = 0.05,
+                                         hi = 0.2, alpha_smooth = true)
+    indicator = IndicatorMax(equations, basis, variable = nonequilibrium)
+    cache = (; alpha = indicator.cache.alpha, alpha_tmp = similar(indicator.cache.alpha))
+    return IndicatorNonequilibriumBlending(promote(alpha_max, lo, hi)..., alpha_smooth,
+                                           indicator, cache)
+end
+
+function (indicator::IndicatorNonequilibriumBlending)(u, mesh, equations, dg, cache;
+                                                      kwargs...)
+    alpha = indicator.indicator(u, mesh, equations, dg, cache; kwargs...)
+    (; alpha_max, lo, hi) = indicator
+    @. alpha = alpha_max * clamp((alpha - lo) / (hi - lo), 0, 1)
+    if indicator.alpha_smooth # as in the HG indicator: neighbours get at least half the alpha
+        alpha_tmp = indicator.cache.alpha_tmp
+        resize!(alpha_tmp, length(alpha))
+        Trixi.apply_smoothing!(mesh, alpha, alpha_tmp, dg, cache)
+    end
+    return alpha
+end
+
+indicator_sc = IndicatorNonequilibriumBlending(equations, basis;
+                                               alpha_max = 0.5, lo = 0.1, hi = 0.3)
 volume_integral = VolumeIntegralShockCapturingRRG(basis, indicator_sc;
                                                   volume_flux_dg = volume_flux,
                                                   volume_flux_fv = surface_flux,

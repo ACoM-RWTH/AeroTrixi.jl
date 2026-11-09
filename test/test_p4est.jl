@@ -86,32 +86,32 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_grad13_forward_facing_step_amr.jl"),
                             l2=[
-                                0.09537127087185128,
-                                0.13876079001597474,
-                                0.035916186708699616,
-                                0.595111499616316,
-                                0.13641717894751745,
-                                0.0497567273600403,
-                                0.5410564771858171,
-                                0.7553291385567212,
-                                0.3024719589176317
+                                0.09784225557544218,
+                                0.14091580974065598,
+                                0.03694390126141289,
+                                0.6058623209891623,
+                                0.14357240880817435,
+                                0.05110306038094828,
+                                0.5471971892937211,
+                                0.7808948523868687,
+                                0.3108282733430392
                             ],
                             linf=[
-                                1.399508828791027,
-                                2.5806658024924007,
-                                2.117841032874909,
-                                10.726831966864466,
-                                5.20101569878602,
-                                2.966645731034303,
-                                9.367373483666057,
-                                15.051951487477226,
-                                20.275898781973915
+                                1.540360529089659,
+                                2.594603171379181,
+                                2.162580959297539,
+                                10.776311796121082,
+                                5.328948402059565,
+                                3.1752186216349254,
+                                9.39985017801082,
+                                15.156899350135467,
+                                20.56546878178541
                             ],
                             tspan=(0.0, 0.02))
 
         # 21 square trees; the mesh follows the shocks forming at the face of the step
         @test Trixi.ntrees(mesh) == 21
-        @test Trixi.nelements(semi.solver, semi.cache) == 1476
+        @test Trixi.nelements(semi.solver, semi.cache) == 1455
         # The solution stays in the physical range: positive density and pressure, and
         # the reflected shock does not exceed the Rankine-Hugoniot density ratio (3 for the
         # relative Mach number 3) by more than the overshoot of the moment shock structure
