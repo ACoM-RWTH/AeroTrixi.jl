@@ -110,64 +110,13 @@ save_solution = SaveSolutionCallback(interval = 500,
                                      solution_variables = cons2moments)
 
 # Refine where the gas is far from equilibrium: the element maximum of the stress and heat
-# flux relative to the pressure. In addition, the elements within the distance `step_distance`
-# of the face and the corner of the step are always refined to the maximum level: the shocks
-# are born at the face of the step, where the inflow is stopped within a few time steps, and
-# the corner expansion is singular. Refining an element only after such a front has formed
-# inside it projects the front onto children elements with negative mean pressure. Level 6
-# gives elements of size 1/192 (node spacing 1/384, as the 1/360 cells of the finite-volume
-# reference); the shock layers at Kn = 0.001 are a few 1/100 wide. The low thresholds also
-# refine the reflected shock and the shear layer from the corner, which are weaker than the
-# bow shock; with 0.02 and 0.1 they stay at the medium level, where the numerical dissipation
-# smears them. The mesh grows to about 14000 elements at t = 1.
-"""
-    IndicatorNonequilibriumStep(semi; step_distance, step_value)
-
-AMR indicator of the forward-facing step: the `IndicatorMax` of [`nonequilibrium`](@ref), raised
-to at least `step_value` in the elements whose center lies within `step_distance` of the face or
-the corner of the step.
-"""
-struct IndicatorNonequilibriumStep{Indicator, RealT, Cache} <: Trixi.AbstractIndicator
-    indicator     :: Indicator
-    step_distance :: RealT
-    step_value    :: RealT
-    cache         :: Cache # the `alpha` of `indicator`, saved as element variable `indicator_amr`
-end
-
-function IndicatorNonequilibriumStep(semi; step_distance, step_value)
-    indicator = IndicatorMax(semi, variable = nonequilibrium)
-    return IndicatorNonequilibriumStep(indicator, step_distance, step_value,
-                                       (; alpha = indicator.cache.alpha))
-end
-
-# distance of `x` from the face of the step (the segment x = 1, 0 ≤ y ≤ 1/3) and from its
-# corner (1, 1/3)
-function distance_to_step(x)
-    if x[1] <= 1
-        return sqrt((1 - x[1])^2 + max(x[2] - 1 / 3, 0)^2)
-    else
-        return sqrt((x[1] - 1)^2 + (x[2] - 1 / 3)^2)
-    end
-end
-
-function (indicator::IndicatorNonequilibriumStep)(u, mesh, equations, dg, cache; kwargs...)
-    alpha = indicator.indicator(u, mesh, equations, dg, cache; kwargs...)
-    node_coordinates = cache.elements.node_coordinates
-    n = nnodes(dg)
-    for element in eachelement(dg, cache)
-        # element center as the mean of its corner nodes
-        center = (Trixi.get_node_coords(node_coordinates, equations, dg, 1, 1, element) +
-                  Trixi.get_node_coords(node_coordinates, equations, dg, n, 1, element) +
-                  Trixi.get_node_coords(node_coordinates, equations, dg, 1, n, element) +
-                  Trixi.get_node_coords(node_coordinates, equations, dg, n, n, element)) / 4
-        if distance_to_step(center) <= indicator.step_distance
-            alpha[element] = max(alpha[element], indicator.step_value)
-        end
-    end
-    return alpha
-end
-
-amr_indicator = IndicatorNonequilibriumStep(semi; step_distance = 0.1, step_value = 1.0)
+# flux relative to the pressure. Level 6 gives elements of size 1/192 (node spacing 1/384, as
+# the 1/360 cells of the finite-volume reference); the shock layers at Kn = 0.001 are a few
+# 1/100 wide. The low thresholds also refine the reflected shock and the shear layer from the
+# corner, which are weaker than the bow shock; with 0.02 and 0.1 they stay at the medium
+# level, where the numerical dissipation smears them. The mesh grows to about 14000 elements
+# at t = 1.
+amr_indicator = IndicatorMax(semi, variable = nonequilibrium)
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 2,
                                       med_level = 4, med_threshold = 0.005,
@@ -178,7 +127,7 @@ amr_callback = AMRCallback(semi, amr_controller,
                            adapt_initial_condition_only_refine = true)
 
 # CFL condition of the hyperbolic part; it also has to keep the explicit relaxation stable
-stepsize_callback = StepsizeCallback(cfl = 0.6)
+stepsize_callback = StepsizeCallback(cfl = 0.5)
 
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
