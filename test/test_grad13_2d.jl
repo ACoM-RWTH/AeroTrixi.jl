@@ -189,4 +189,16 @@ const mirrorA_x = SVector(1.3, -0.91, -0.52, 2.5675, 2.327, 0.169, 1.443, -3.102
     end
 end
 
+@testset "p4est_mesh_forward_facing_step" begin
+    mesh = p4est_mesh_forward_facing_step(polydeg = 2)
+    @test Trixi.ntrees(mesh) == 21
+    @test sort(unique(mesh.boundary_names)) ==
+          sort([Symbol("---"), :inflow, :outflow, :wall])
+    @test count(==(:inflow), mesh.boundary_names) == 3
+    @test count(==(:outflow), mesh.boundary_names) == 2
+    @test count(==(:wall), mesh.boundary_names) == 3 + 9 + 1 + 6 # bottom, top, step face, step top
+    @test_throws AssertionError p4est_mesh_forward_facing_step(polydeg = 2,
+                                                               tree_size = 0.4)
+end
+
 end # module

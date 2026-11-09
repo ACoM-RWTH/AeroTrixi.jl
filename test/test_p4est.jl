@@ -82,38 +82,37 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
 
-    @trixi_testset "elixir_grad13_forward_facing_step.jl" begin
+    @trixi_testset "elixir_grad13_forward_facing_step_amr.jl" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                     "elixir_grad13_forward_facing_step.jl"),
+                                     "elixir_grad13_forward_facing_step_amr.jl"),
                             l2=[
-                                0.1053006330865879,
-                                0.13834765276193717,
-                                0.03151734127520135,
-                                0.6123915835292422,
-                                0.16683352796190495,
-                                0.03227736638629184,
-                                0.5334625389967529,
-                                0.7933732774812324,
-                                0.2636803208381341
+                                0.11023202877243597,
+                                0.14396097049222742,
+                                0.03588407793940817,
+                                0.6536468221945436,
+                                0.18002671333933623,
+                                0.04616398051029551,
+                                0.5729248352907773,
+                                0.8238621977296843,
+                                0.2903632271983952
                             ],
                             linf=[
-                                2.0068177778427136,
-                                2.622287620154385,
-                                2.5086363401564267,
-                                11.576795315791458,
-                                3.963669589681781,
-                                2.1150808151074125,
-                                9.953073639677466,
-                                15.42620054825871,
-                                20.49437640689997
+                                1.9170284310504555,
+                                2.5850613512673672,
+                                2.570516720103975,
+                                11.61649920996311,
+                                4.486721555986335,
+                                3.1594888800919,
+                                9.966242651623423,
+                                15.099478187611517,
+                                22.515223654020485
                             ],
                             tspan=(0.0, 0.02))
 
-        # The Gmsh mesh has 219 quadrilaterals, graded from 1/3 in the far field to 1/72 at
-        # the step, each refined uniformly once by p4est and then adapted around the shocks
-        # forming at the face of the step
-        @test Trixi.ntrees(mesh) == 219
-        @test Trixi.nelements(semi.solver, semi.cache) == 2805
+        # 21 square trees; the elements around the face and the corner of the step are refined
+        # to the maximum level from the start, the rest of the mesh follows the shocks
+        @test Trixi.ntrees(mesh) == 21
+        @test Trixi.nelements(semi.solver, semi.cache) == 2382
         # The solution stays in the physical range: positive density and pressure, and
         # the reflected shock does not exceed the Rankine-Hugoniot density ratio (3 for the
         # relative Mach number 3) by more than the overshoot of the moment shock structure

@@ -58,6 +58,7 @@ include("callbacks_step/callbacks_step.jl")
 include("thermo_models/thermo_models.jl")
 include("equations/equations.jl")
 include("meshes/p4est_mesh_from_vertices.jl")
+include("meshes/p4est_mesh_forward_facing_step.jl")
 include("meshes/lnodes_q2.jl")
 include("meshes/q2_transfer.jl")
 
@@ -83,5 +84,6 @@ export gridap_q2_function, gridap_node_values
 export Grad13Equations2D, source_terms_grad13, flux_hll_grad13, cons2moments,
        von_mises_stress,
        nonequilibrium, collision_frequency, max_collision_frequency, specular_reflection
+export p4est_mesh_forward_facing_step
 
 end
