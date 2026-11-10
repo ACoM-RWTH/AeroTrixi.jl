@@ -49,12 +49,9 @@ mesh_alpha = 0.5         # transparency of the element outlines
 neq_levels = [0.05]  #[0.03, 0.05, 0.1, 0.2, 0.3]   # contour lines of the non-equilibrium measure, or `nothing`
 neq_color = :orange
 outfile = "plot.png"      # e.g. "ffs_density.png", or `nothing` to only display
-# `viewer`: external image viewer started detached with the PNG as last argument, e.g.
-# ImageMagick's `display` with its window pinned at screen position +100+100, or `nothing` for
-# CairoMakie's own `display`, which in a terminal REPL calls `xdg-open` and blocks until the
-# viewer exits (e.g. on WSL).
-show_figure = false
-viewer = `display -geometry +100+100`
+show_figure = true        # open the figure in a viewer. In a terminal REPL, CairoMakie writes a
+# PNG and calls `xdg-open`, which blocks until the viewer exits (e.g.
+# ImageMagick's `display` on WSL); set `false` and use `outfile` instead
 
 # ----------------------------------------------------------------------------
 # sample_dg: evaluate the DG solution of the axis-aligned elements on a regular grid of cell
@@ -204,16 +201,8 @@ fig, ax = plot_ffs_dg(sol, semi, var; label = label, kind = kind, levels = level
                       colormap = colormap, nx = nx, mesh_lines = mesh_lines,
                       mesh_alpha = mesh_alpha, neq_levels = neq_levels,
                       neq_color = neq_color)
+show_figure && display(fig)
 outfile === nothing || CairoMakie.save(outfile, fig)
-if show_figure
-    if viewer === nothing
-        display(fig)
-    else
-        file = outfile === nothing ? joinpath(mktempdir(), "ffs.png") : outfile
-        outfile === nothing && CairoMakie.save(file, fig)
-        run(`$viewer $file`; wait = false)
-    end
-end
 
 # ----------------------------------------------------------------------------
 # Further plots from the REPL, e.g.:
