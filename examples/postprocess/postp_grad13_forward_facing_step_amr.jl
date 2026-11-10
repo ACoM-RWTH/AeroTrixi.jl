@@ -38,17 +38,18 @@ neq = nt -> nt.neq # non-equilibrium measure `nonequilibrium` (AMR and blending 
 zeroval = nt -> 0.0 # a constant function for testing the colourbar range
 
 # --- plot settings ------------------------------------------------------------
-var = zeroval        # a variable name, OR a function above (then set `label`)
+var = "rho"        # a variable name, OR a function above (then set `label`)
 label = "model refinement"    # colourbar/title text (required when `var` is a function)
 kind = :contourf    # :contourf or :heatmap
 levels = 40           # number of contour levels
-colormap = :deep  # colour map for the filled contours
+colormap = :turbo  # colour map for the filled contours, eg :viridis, :plasma, :deep, :cividis, :turbo, :grays
 nx = 600          # sampling resolution in x (ny = nx / 3)
 mesh_lines = :brown       # colour of the element outlines, or `nothing` for none
 mesh_alpha = 0.5         # transparency of the element outlines
 neq_levels = [0.05]  #[0.03, 0.05, 0.1, 0.2, 0.3]   # contour lines of the non-equilibrium measure, or `nothing`
 neq_color = :orange
 outfile = "plot.png"      # e.g. "ffs_density.png", or `nothing` to only display
+show_figure = false        # open the figure in a viewer. 
 
 # ----------------------------------------------------------------------------
 # sample_dg: evaluate the DG solution of the axis-aligned elements on a regular grid of cell
@@ -198,7 +199,7 @@ fig, ax = plot_ffs_dg(sol, semi, var; label = label, kind = kind, levels = level
                       colormap = colormap, nx = nx, mesh_lines = mesh_lines,
                       mesh_alpha = mesh_alpha, neq_levels = neq_levels,
                       neq_color = neq_color)
-display(fig)
+show_figure && display(fig)
 outfile === nothing || CairoMakie.save(outfile, fig)
 
 # ----------------------------------------------------------------------------
