@@ -35,24 +35,25 @@ vonMises = nt -> sqrt(1.5 * ((nt.P11 - nt.p)^2 + (nt.P22 - nt.p)^2 +
                        (2 * nt.p - nt.P11 - nt.P22)^2 + 2 * nt.P12^2))
 heatflux = nt -> sqrt(nt.q1^2 + nt.q2^2)                    # |q|
 neq = nt -> nt.neq # non-equilibrium measure `nonequilibrium` (AMR and blending indicator)
+zeroval = nt -> 0.0 # a constant function for testing the colourbar range
 
 # --- plot settings ------------------------------------------------------------
-var = "rho"        # a variable name, OR a function above (then set `label`)
-label = "density"    # colourbar/title text (required when `var` is a function)
+var = zeroval        # a variable name, OR a function above (then set `label`)
+label = "model refinement"    # colourbar/title text (required when `var` is a function)
 kind = :contourf    # :contourf or :heatmap
 levels = 40           # number of contour levels
-colormap = :viridis
+colormap = :deep  # colour map for the filled contours
 nx = 600          # sampling resolution in x (ny = nx / 3)
-mesh_lines = :black       # colour of the element outlines, or `nothing` for none
-mesh_alpha = 0.35         # transparency of the element outlines
-neq_levels = [0.1, 0.3]   # contour lines of the non-equilibrium measure, or `nothing`
-neq_color = :white
-outfile = nothing      # e.g. "ffs_density.png", or `nothing` to only display
+mesh_lines = :brown       # colour of the element outlines, or `nothing` for none
+mesh_alpha = 0.5         # transparency of the element outlines
+neq_levels = [0.05]  #[0.03, 0.05, 0.1, 0.2, 0.3]   # contour lines of the non-equilibrium measure, or `nothing`
+neq_color = :orange
+outfile = "plot.png"      # e.g. "ffs_density.png", or `nothing` to only display
 # `viewer`: external image viewer started detached with the PNG as last argument, e.g.
 # ImageMagick's `display` with its window pinned at screen position +100+100, or `nothing` for
 # CairoMakie's own `display`, which in a terminal REPL calls `xdg-open` and blocks until the
 # viewer exits (e.g. on WSL).
-show_figure = true
+show_figure = false
 viewer = `display -geometry +100+100`
 
 # ----------------------------------------------------------------------------
@@ -182,7 +183,7 @@ function plot_ffs_dg(sol, semi, var; label = nothing, kind = :contourf, levels =
     # title inside the step: a white box with a thin black frame in the bottom-right corner
     nel = Trixi.nelements(semi.solver, semi.cache)
     t = round(sol.t[end]; digits = 4)
-    ttl = "G13 Moment Eqns, $(vname),  t = $t,  Kn = $(semi.equations.Kn)\nDG/AMR, $nel elements"
+    ttl = "G13 Moment Eqns, $(vname),  t = $t,  Kn = $(semi.equations.Kn)\nTrixi.jl DG/AMR, $nel elements"
     pad = 0.012 * (xmax - xmin)
     bw = 0.95 * (sx1 - sx0)
     bh = 0.40 * (sy1 - sy0)

@@ -23,7 +23,7 @@ using AeroTrixi
 # analysis output prints the maximum of ν to judge ν Δt. With the refinement below, the CFL
 # time step keeps ν Δt at about 1; coarser meshes need a smaller CFL number.
 
-Kn = 0.001
+Kn = 0.005
 equations = Grad13Equations2D(Kn)
 
 """
@@ -158,8 +158,8 @@ save_solution = SaveSolutionCallback(interval = 500,
 amr_indicator = IndicatorMax(semi, variable = nonequilibrium)
 amr_controller = ControllerThreeLevel(semi, amr_indicator,
                                       base_level = 2,
-                                      med_level = 4, med_threshold = 0.005,
-                                      max_level = 6, max_threshold = 0.03)
+                                      med_level = 4, med_threshold = 0.01,
+                                      max_level = 6, max_threshold = 0.04)
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 5,
                            adapt_initial_condition = true,
