@@ -21,7 +21,7 @@
 # NamedTuple of all of them plus the non-equilibrium measure `neq`.
 # ----------------------------------------------------------------------------
 
-using CairoMakie
+import CairoMakie # all Makie calls are qualified so that the script also works with Plots loaded
 using Trixi, AeroTrixi
 
 # --- derived quantities (functions of the variables) ------------------------
@@ -95,12 +95,12 @@ end
 function element_outlines(semi)
     xc = semi.cache.elements.node_coordinates
     nn = Trixi.nnodes(semi.solver)
-    segs = Point2f[]
+    segs = CairoMakie.Point2f[]
     for e in 1:Trixi.nelements(semi.solver, semi.cache)
-        c = (Point2f(xc[1, 1, 1, e], xc[2, 1, 1, e]),
-             Point2f(xc[1, nn, 1, e], xc[2, nn, 1, e]),
-             Point2f(xc[1, nn, nn, e], xc[2, nn, nn, e]),
-             Point2f(xc[1, 1, nn, e], xc[2, 1, nn, e]))
+        c = (CairoMakie.Point2f(xc[1, 1, 1, e], xc[2, 1, 1, e]),
+             CairoMakie.Point2f(xc[1, nn, 1, e], xc[2, nn, 1, e]),
+             CairoMakie.Point2f(xc[1, nn, nn, e], xc[2, nn, nn, e]),
+             CairoMakie.Point2f(xc[1, 1, nn, e], xc[2, 1, nn, e]))
         push!(segs, c[1], c[2], c[2], c[3], c[3], c[4], c[4], c[1])
     end
     return segs
@@ -133,40 +133,44 @@ function plot_ffs_dg(sol, semi, var; label = nothing, kind = :contourf, levels =
 
     aspect = (xmax - xmin) / (ymax - ymin)
     axh = 300
-    fig = Figure(size = (round(Int, axh * aspect) + 140, axh + 70))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), xgridvisible = false, ygridvisible = false)
+    fig = CairoMakie.Figure(size = (round(Int, axh * aspect) + 140, axh + 70))
+    ax = CairoMakie.Axis(fig[1, 1]; aspect = CairoMakie.DataAspect(), xgridvisible = false,
+                         ygridvisible = false)
 
     plt = if kind === :contourf
         lev = range(colorrange[1] - 1e-6, colorrange[2] + 1e-6; length = levels + 1)
-        contourf!(ax, xs, ys, V; levels = lev, colormap = colormap)
+        CairoMakie.contourf!(ax, xs, ys, V; levels = lev, colormap = colormap)
     elseif kind === :heatmap
-        heatmap!(ax, xs, ys, V; colormap = colormap, colorrange = colorrange,
-                 nan_color = :transparent)
+        CairoMakie.heatmap!(ax, xs, ys, V; colormap = colormap, colorrange = colorrange,
+                            nan_color = :transparent)
     else
         error("unknown kind=$kind")
     end
 
     if neq_levels !== nothing
         N = [isnan(nt.rho) ? NaN : nt.neq for nt in Z]
-        contour!(ax, xs, ys, N; levels = neq_levels, color = neq_color, linewidth = 1.0)
+        CairoMakie.contour!(ax, xs, ys, N; levels = neq_levels, color = neq_color,
+                            linewidth = 1.0)
     end
     if mesh_lines !== nothing
-        linesegments!(ax, element_outlines(semi); color = (mesh_lines, mesh_alpha),
-                      linewidth = 0.4)
+        CairoMakie.linesegments!(ax, element_outlines(semi);
+                                 color = (mesh_lines, mesh_alpha),
+                                 linewidth = 0.4)
     end
 
     # the step in light red, drawn on top so the blank cells read as a solid region
-    poly!(ax, Point2f[(sx0, sy0), (sx1, sy0), (sx1, sy1), (sx0, sy1)];
-          color = (:red, 0.22), strokecolor = (:firebrick, 0.6), strokewidth = 0.8)
-    limits!(ax, xmin, xmax, ymin, ymax)
+    CairoMakie.poly!(ax, CairoMakie.Point2f[(sx0, sy0), (sx1, sy0), (sx1, sy1), (sx0, sy1)];
+                     color = (:red, 0.22), strokecolor = (:firebrick, 0.6),
+                     strokewidth = 0.8)
+    CairoMakie.limits!(ax, xmin, xmax, ymin, ymax)
 
     vname = label !== nothing ? String(label) :
             var isa Function ?
             error("plot_ffs_dg: `var` is a function -- pass `label=...`") :
             String(var)
-    Colorbar(fig[1, 2], plt; width = 12, ticklabelsize = 14, labelsize = 14)
-    rowsize!(fig.layout, 1, Aspect(1, 1 / aspect))
-    colgap!(fig.layout, 8)
+    CairoMakie.Colorbar(fig[1, 2], plt; width = 12, ticklabelsize = 14, labelsize = 14)
+    CairoMakie.rowsize!(fig.layout, 1, CairoMakie.Aspect(1, 1 / aspect))
+    CairoMakie.colgap!(fig.layout, 8)
 
     # title inside the step: a white box with a thin black frame in the bottom-right corner
     nel = Trixi.nelements(semi.solver, semi.cache)
@@ -179,10 +183,11 @@ function plot_ffs_dg(sol, semi, var; label = nothing, kind = :contourf, levels =
     bx0 = bx1 - bw
     by0 = sy0 + pad
     by1 = by0 + bh
-    poly!(ax, Point2f[(bx0, by0), (bx1, by0), (bx1, by1), (bx0, by1)];
-          color = :white, strokecolor = :black, strokewidth = 0.8)
-    text!(ax, 0.5 * (bx0 + bx1), 0.5 * (by0 + by1); text = ttl,
-          align = (:center, :center), fontsize = 16, color = :black, space = :data)
+    CairoMakie.poly!(ax, CairoMakie.Point2f[(bx0, by0), (bx1, by0), (bx1, by1), (bx0, by1)];
+                     color = :white, strokecolor = :black, strokewidth = 0.8)
+    CairoMakie.text!(ax, 0.5 * (bx0 + bx1), 0.5 * (by0 + by1); text = ttl,
+                     align = (:center, :center), fontsize = 16, color = :black,
+                     space = :data)
 
     return fig, ax
 end
@@ -192,7 +197,7 @@ fig, ax = plot_ffs_dg(sol, semi, var; label = label, kind = kind, levels = level
                       mesh_alpha = mesh_alpha, neq_levels = neq_levels,
                       neq_color = neq_color)
 display(fig)
-outfile === nothing || save(outfile, fig)
+outfile === nothing || CairoMakie.save(outfile, fig)
 
 # ----------------------------------------------------------------------------
 # Further plots from the REPL, e.g.:
