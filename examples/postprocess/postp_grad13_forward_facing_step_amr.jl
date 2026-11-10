@@ -34,6 +34,7 @@ mach = nt -> sqrt(nt.v1^2 + nt.v2^2) / sqrt(nt.theta) # Mach number (a = √θ)
 vonMises = nt -> sqrt(1.5 * ((nt.P11 - nt.p)^2 + (nt.P22 - nt.p)^2 +
                        (2 * nt.p - nt.P11 - nt.P22)^2 + 2 * nt.P12^2))
 heatflux = nt -> sqrt(nt.q1^2 + nt.q2^2)                    # |q|
+neq = nt -> nt.neq # non-equilibrium measure `nonequilibrium` (AMR and blending indicator)
 
 # --- plot settings ------------------------------------------------------------
 var = "rho"        # a variable name, OR a function above (then set `label`)
@@ -203,6 +204,6 @@ outfile === nothing || CairoMakie.save(outfile, fig)
 # Further plots from the REPL, e.g.:
 #   fig, _ = plot_ffs_dg(sol, semi, vonMises; label = "von-Mises-stress", colormap = :deep); display(fig)
 #   fig, _ = plot_ffs_dg(sol, semi, "theta"; label = "temperature", mesh_lines = :white)
-#   fig, _ = plot_ffs_dg(sol, semi, nt -> nt.neq; label = "non-equilibrium", kind = :heatmap,
+#   fig, _ = plot_ffs_dg(sol, semi, neq; label = "non-equilibrium", kind = :heatmap,
 #                        neq_levels = [0.1, 0.3])
 # ----------------------------------------------------------------------------
