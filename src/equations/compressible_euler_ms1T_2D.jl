@@ -602,6 +602,11 @@ This flux is a faster approximate version of the multi-species entropy-conservat
   Entropy-conservative high-order methods for high-enthalpy gas flows
   [DOI: 10.1016/j.compfluid.2025.106640](https://doi.org/10.1016/j.compfluid.2025.106640)
 
+The approximation is described in
+- Beatriz Fagá, Georgii Oblapenko, Yiyang Zhu, Daniel Doehring, Manuel Torrilhon (2026)
+  Efficient high-order Discontinuous Galerkin simulations of multi-species high-enthalpy flows
+  [DOI: 10.48550/arXiv.2611.12511](https://doi.org/10.48550/arXiv.2611.12511)
+
 The multi-species version is also described in
 - Georgii Oblapenko, Arseniy Tarnovskiy, Moritz Ertl, Manuel Torrilhon (2026)
   Entropy-Stable Fluxes for High-Order Discontinuous Galerkin Simulations of High-Enthalpy Flows

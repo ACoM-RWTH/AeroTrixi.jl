@@ -87,8 +87,9 @@ end
 """
     generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_anh, E_diss; ground_level_energy_zero = true)
 
-Anharmonic level energies (K), ``E_i = (i + 1/2) Θ - (i + 1/2)^2 Θ_{anh}``, below `E_diss`
-(K); see [`generate_e_vibr_arr_harmonic_cutoff_K`](@ref).
+Anharmonic level energies (K), ``E_i = (i + 1/2) Θ - (i + 1/2)^2 Θ_{anh}``, below `E_diss` (K)
+and up to the maximum of the quadratic spectrum, beyond which the energies would decrease
+with `i` and the approximation loses validity; see [`generate_e_vibr_arr_harmonic_cutoff_K`](@ref).
 """
 function generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_anh, E_diss;
                                                  ground_level_energy_zero = true)
@@ -96,10 +97,11 @@ function generate_e_vibr_arr_anharmonic_cutoff_K(Θ, Θ_anh, E_diss;
     i = 0
     while (true)
         # compute vibrational energy of state i
-        # if it's less than dissociation energy, add it to the array
-        # if it's larger, stop computation
+        # add it to the array if it is less than the dissociation energy and larger than
+        # the previous level; otherwise stop: beyond the maximum of the quadratic spectrum,
+        # the energies would decrease and the approximation loses validity
         enew = (i + 0.5) * Θ - (i + 0.5)^2 * Θ_anh
-        if (enew < E_diss)
+        if enew < E_diss && (isempty(v_e_arr) || enew > v_e_arr[end])
             push!(v_e_arr, enew)
             i += 1
         else
