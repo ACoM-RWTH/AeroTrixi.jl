@@ -1,15 +1,34 @@
 # AeroTrixi.jl
 
-**AeroTrixi.jl** is a package for high-fidelity aerodynamic simulations built on top of [Trixi.jl](https://github.com/trixi-framework/Trixi.jl).
-Currently, it extends Trixi.jl's capabilities with a callback for pointwise surface quantities in aerodynamic applications.
-In the future, we plan to add more features for nonideal and rarefied gases, for instance.
+**AeroTrixi.jl** is a package for high-fidelity aerodynamic simulations built on top of
+[Trixi.jl](https://github.com/trixi-framework/Trixi.jl). It adds pointwise surface
+quantities for aerodynamic applications, thermodynamics and entropy-conservative fluxes for
+multi-species flows of calorically imperfect gases, and a bridge to continuous finite
+elements of [Gridap.jl](https://github.com/gridap/Gridap.jl) for hyperbolic systems coupled
+to elliptic equations. In the future, we plan to add more features for nonideal and
+rarefied gases, for instance.
 
 ## Features
 
-- **Surface pressure and friction coefficients**: Compute and save pointwise aerodynamic coefficients along boundaries
-- **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
-- **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
-- **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with [Gridap.jl](https://github.com/gridap/Gridap.jl), solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with `polydeg = 2` and Q2 elements), with sources from and results written into the DG solution, once per time step or on each Runge-Kutta stage via [`GridapCallback`](@ref); for example, the Euler equations with an electrostatic potential, [`CompressibleEulerPoissonEquations2D`](@ref). See [the documentation of the bridge](trixi_gridap_bridge.md)
+- **Surface pressure and friction coefficients**: the [`SurfacePointwiseCallback`](@ref)
+  computes and saves pointwise aerodynamic coefficients along boundaries, such as
+  [`SurfacePressureCoefficient`](@ref) and [`SurfaceFrictionCoefficient`](@ref)
+  (see [Surface quantities](api/surface_quantities.md)).
+- **Thermodynamic data**: tabulated internal energies and specific heats with interpolation
+  and temperature inversion routines for multi-species flows in thermal equilibrium via
+  [`ThermoData1T`](@ref), with models for rotational and vibrational energies
+  (see [Thermodynamics](api/thermodynamics.md)).
+- **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**:
+  [`CompressibleEulerEquationsMs1T2D`](@ref) for 2D multi-species flows based on tabulated
+  thermodynamic data, with the entropy-conservative flux [`flux_oblapenko_etal`](@ref) and
+  its faster approximation [`flux_oblapenko_etal_taylor`](@ref); chemical reactions are
+  possible via source terms (see [Multi-species equations](api/multispecies_equations.md)).
+- **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with
+  Gridap.jl, solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with
+  `polydeg = 2` and Q2 elements), with sources from and results written into the DG
+  solution, on each Runge-Kutta stage via the [`GridapCallback`](@ref); for example, the
+  Euler equations of a charged gas, [`CompressibleEulerPoissonEquations2D`](@ref) (see the
+  [guide](trixi_gridap_bridge.md) and the [API](api/trixi_gridap_bridge.md)).
 
 ## Installation
 
@@ -20,20 +39,22 @@ using Pkg
 Pkg.add("AeroTrixi")
 ```
 
-## Quick Start
+## Examples
 
-To get started, it is best to take a look at the examples.
-Currently, the additional functionality provided by AeroTrixi.jl is
+To get started, it is best to take a look at the examples in the folder returned by
+[`examples_dir`](@ref), which run with `trixi_include` like the examples of Trixi.jl:
 
-- the `SurfacePointwiseCallback` which can be used to compute and save pointwise aerodynamic coefficients along boundaries,
-such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
-- the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
-- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows, which is based on tabulated thermodynamic data. Two entropy-conservative fluxes are available: `flux_oblapenko_etal` and `flux_oblapenko_etal_taylor`; the latter uses a third-order Taylor series expansion for one of the logarithms in the entropy function and is approximately more 20% faster than the exact flux, with entropy conservation staying at approximately same level of accuracy for small temperature discretization steps (~1 K).
+| Feature | Examples |
+|---|---|
+| Aerodynamic flows and surface quantities | `p4est_2d_dgsem/elixir_euler_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_NACA0012airfoil_mach08.jl`, `p4est_3d_dgsem/elixir_euler_ONERA_M6_AVI.jl` (with surface coefficients), `p4est_3d_dgsem/elixir_euler_DPW3_wing.jl` |
+| Multi-species flows | `tree_2d_dgsem/elixir_eulermst1T_ec.jl` (entropy conservation), `tree_2d_dgsem/elixir_eulermst1T_chem.jl` (dissociation), `p4est_2d_dgsem/elixir_eulerms1T_1speciescylinder.jl`, `p4est_2d_dgsem/elixir_eulerms1T_2speciescylinder_chem.jl` (hypersonic cylinder) |
+| Trixi.jl-Gridap.jl bridge | `p4est_2d_dgsem/elixir_euler_poisson_blast_five_trees_amr.jl` |
 
 ## Documentation
 
-See the [API Reference](@ref) for documentation on available/extended functions.
-
+The [guide to the Trixi.jl-Gridap.jl bridge](trixi_gridap_bridge.md) explains its
+foundations and usage. The [API Reference](api.md) documents all functions and types,
+grouped by topic.
 
 ## Credit
 

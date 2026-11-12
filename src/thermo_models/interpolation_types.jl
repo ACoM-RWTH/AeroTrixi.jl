@@ -1,5 +1,11 @@
 # what kind of interpolation we use for the quantities
 abstract type Interpolation end
+
+"""
+    LinearInterpolation <: Interpolation
+
+Linear interpolation in the temperature tables of [`ThermoData1T`](@ref).
+"""
 struct LinearInterpolation <: Interpolation end
 
 # subtypes  whether we store c_v(T) at T_min + i * dT (NoCvOffset)

@@ -145,6 +145,24 @@ end
               ve_offset
     end
 
+    @testset "anharmonic ladder: cutoff at the maximum of the spectrum" begin
+        # with Θ = 2000 K and Θ_anh = 20 K, the levels increase up to the maximum
+        # Θ^2 / (4 Θ_anh) = 50000 K at i + 1/2 = 49.5; with a dissociation energy above
+        # it, the ladder ends there instead of continuing with decreasing energies
+        ve = generate_e_vibr_arr_anharmonic_cutoff_K(2000.0, 20.0, 60000.0;
+                                                     ground_level_energy_zero = false)
+        @test length(ve) == 50
+        @test all(diff(ve) .> 0)
+        @test ve[end] < 50000.0
+
+        # below the maximum, the dissociation energy is the cutoff as before
+        ve_diss = generate_e_vibr_arr_anharmonic_cutoff_K(2000.0, 20.0, 40000.0;
+                                                          ground_level_energy_zero = false)
+        @test ve_diss[end] < 40000.0 <=
+              (length(ve_diss) + 0.5) * 2000.0 -
+              (length(ve_diss) + 0.5)^2 * 20.0
+    end
+
     @testset "Boltzmann averaging" begin
         ve = generate_e_vibr_arr_harmonic_cutoff_K(Θ, E_DISS)
 

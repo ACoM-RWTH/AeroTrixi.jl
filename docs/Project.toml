@@ -1,6 +1,8 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterInterLinks = "d12716ef-a0f6-4df4-a9f1-a5a34e75c656"
 AeroTrixi = "96ec6574-3e85-11f1-3b3c-2957db4b7004"
 
 [compat]
 Documenter = "1.11"
+DocumenterInterLinks = "1"
