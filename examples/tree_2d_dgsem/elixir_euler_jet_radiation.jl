@@ -6,6 +6,9 @@ using Trixi
 gamma = 5 / 3
 equations = CompressibleEulerEquations2D(gamma)
 
+rho_ambient() = 0.5
+p_ambient() = 0.4127
+
 # Initial condition adopted from
 # - Xiangxiong Zhang and Chi-Wang Shu (2011)
 #   Positivity-preserving high order discontinuous Galerkin schemes
@@ -15,17 +18,17 @@ equations = CompressibleEulerEquations2D(gamma)
 function initial_condition_astro_jet(x, t, equations::CompressibleEulerEquations2D)
     RealT = eltype(x)
     @unpack gamma = equations
-    rho = 0.5f0
+    rho = rho_ambient()
     v1 = 0
     v2 = 0
-    p = convert(RealT, 0.4127)
+    p = p_ambient()
     # add inflow for t>0 at x=-0.5
     # domain size is [-0.5,+0.5]^2
     if (t > 0) && (x[1] ≈ -0.5f0) && (abs(x[2]) < RealT(0.05))
         rho = 5.0f0
         v1 = 800 # about Mach number Ma = 2000
         v2 = 0
-        p = convert(RealT, 0.4127)
+        p = p_ambient()
     end
     return prim2cons(SVector(rho, v1, v2, p), equations)
 end
@@ -37,7 +40,7 @@ boundary_conditions = (; x_neg = BoundaryConditionDirichlet(initial_condition_as
                        y_pos = boundary_condition_periodic)
 
 surface_flux = flux_lax_friedrichs
-volume_flux = flux_ranocha # works with Chandrashekar flux as well
+volume_flux = flux_ranocha
 polydeg = 3
 basis = LobattoLegendreBasis(polydeg)
 
@@ -100,8 +103,9 @@ end
     return SVector(zero(RealT), zero(RealT), zero(RealT), -cooling)
 end
 
-# Ambient state of the initial condition
-radiative_cooling = SourceTermRadiativeCooling(rho_ambient = 0.5, p_ambient = 0.4127,
+# Ambient state
+radiative_cooling = SourceTermRadiativeCooling(rho_ambient = rho_ambient(),
+                                               p_ambient = p_ambient(),
                                                Lambda_tilde = 8.776)
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
@@ -138,22 +142,15 @@ amr_controller = ControllerThreeLevelCombined(semi, amr_indicator, indicator_sc,
                                               max_level = 8, max_threshold = 0.003,
                                               max_threshold_secondary = indicator_sc.alpha_max)
 
-# Set `limiter! = positivity_limiter` to apply the positivity-preserving limiter after
-# coarsening and refinement steps.
 amr_callback = AMRCallback(semi, amr_controller,
                            interval = 1,
                            adapt_initial_condition = true,
                            adapt_initial_condition_only_refine = true,
                            limiter! = positivity_limiter)
 
-save_solution = SaveSolutionCallback(interval = analysis_interval,
-                                     save_initial_solution = true,
-                                     save_final_solution = true,
-                                     solution_variables = cons2prim)
-
 callbacks = CallbackSet(summary_callback,
                         analysis_callback, alive_callback,
-                        amr_callback, save_solution)
+                        amr_callback)
 
 ###############################################################################
 # run the simulation
