@@ -91,6 +91,59 @@ isdir(outdir) && rm(outdir, recursive = true)
         # (e.g., from type instabilities)
         @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
     end
+
+    @trixi_testset "elixir_euler_jet_radiation.jl" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_euler_jet_radiation.jl"),
+                            l2=[
+                                0.35013770759131785,
+                                10.154356103556498,
+                                0.22983786449500881,
+                                143.13027029364227
+                            ],
+                            linf=[
+                                13.851985448577878,
+                                351.25110304718004,
+                                13.035064477692359,
+                                4498.2070633824
+                            ],
+                            tspan=(0.0, 0.005))
+
+        # Radiative cooling source term: only the energy equation is affected, and
+        # only gas hotter than the ambient gas with pressure above ambient is cooled
+        let source = radiative_cooling
+            # ambient state: T = T_a, no cooling
+            u = prim2cons(SVector(rho_ambient(), 0.0, 0.0, p_ambient()), equations)
+            @test source(u, nothing, 0.0, equations) == zero(u)
+
+            # cold, dense jet gas: T < T_a, no cooling
+            u = prim2cons(SVector(5.0, 30.0, 0.0, p_ambient()), equations)
+            @test source(u, nothing, 0.0, equations) == zero(u)
+
+            # hot gas: T > T_a and p > p_a
+            p = 1.0
+            u = prim2cons(SVector(rho_ambient(), 1.0, 2.0, p), equations)
+            @test source(u, nothing, 0.0, equations) ≈
+                  SVector(0.0, 0.0, 0.0, -8.776 * (p^2 - p_ambient()^2))
+
+            # hot, rarefied gas: T > T_a but p < p_a, no heating
+            u = prim2cons(SVector(0.01, 0.0, 0.0, 0.1), equations)
+            @test source(u, nothing, 0.0, equations) == zero(u)
+        end
+
+        # The cooling is active in a substantial part of the domain
+        let u = Trixi.wrap_array(sol.u[end], semi)
+            n_cooled = count(CartesianIndices(axes(u)[2:end])) do I
+                u_node = Trixi.get_node_vars(u, equations, solver, Tuple(I)...)
+                return radiative_cooling(u_node, nothing, 0.0, equations)[4] < 0
+            end
+            @test n_cooled > 0
+        end
+
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+    end
 end
 
 end # module

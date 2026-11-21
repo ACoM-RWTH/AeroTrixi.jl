@@ -14,19 +14,17 @@ p_ambient() = 0.4127
 #   Positivity-preserving high order discontinuous Galerkin schemes
 #   for compressible Euler equations with source terms
 #   https://doi.org/10.1016/j.jcp.2010.10.036
-# Mach increased from 80 to about 2000
+# Mach 80 jet (with respect to the jet gas) entering the domain at x = 0
 function initial_condition_astro_jet(x, t, equations::CompressibleEulerEquations2D)
     RealT = eltype(x)
-    @unpack gamma = equations
     rho = rho_ambient()
     v1 = 0
     v2 = 0
     p = p_ambient()
-    # add inflow for t>0 at x=-0.5
-    # domain size is [-0.5,+0.5]^2
-    if (t > 0) && (x[1] ≈ -0.5f0) && (abs(x[2]) < RealT(0.05))
+    # add inflow for t > 0 at x = 0 and |y| < 0.05
+    if (t > 0) && (x[1] ≈ 0) && (abs(x[2]) < RealT(0.05))
         rho = 5.0f0
-        v1 = 800 # about Mach number Ma = 2000
+        v1 = 30 # Mach number Ma ≈ 80 with respect to the jet gas
         v2 = 0
         p = p_ambient()
     end
@@ -56,14 +54,16 @@ volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
 
 solver = DGSEM(basis, surface_flux, volume_integral)
 
-coordinates_min = (-0.5, -0.5)
-coordinates_max = (0.5, 0.5)
+# Zhang and Shu (2011) use the domain [0, 2] x [-0.5, 0.5].
+# Since the `TreeMesh` requires a square domain, we use [0, 2] x [-1, 1].
+coordinates_min = (0.0, -1.0)
+coordinates_max = (2.0, 1.0)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
                 periodicity = (false, true))
 
-# Simplified radiative cooling model used in section 3.4 of 
+# Simplified radiative cooling model used in section 3.4 of
 # - Xiangxiong Zhang and Chi-Wang Shu (2011)
 #   Positivity-preserving high order discontinuous Galerkin schemes
 #   for compressible Euler equations with source terms
@@ -71,6 +71,7 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
 # The energy equation obtains the sink
 #   dE/dt = -Λ̃ (p² - p_a²) for T > T_a, and 0 otherwise,
 # with ambient pressure p_a and ambient temperature T_a.
+# The sink is clipped at zero, i.e., hot but rarefied gas (p < p_a) is not heated.
 # Since T ∝ p / ρ, the condition T > T_a is evaluated as p / ρ > p_a / ρ_a.
 # Λ̃ = 8.776 is the value given in
 # - Y. Ha, C. Gardner, A. Gelb, C.-W. Shu (2005)
@@ -95,7 +96,7 @@ end
     RealT = eltype(u)
 
     if p > source.p_over_rho_ambient * rho # T > T_a
-        cooling = convert(RealT, source.Lambda_tilde * (p^2 - source.p_ambient^2))
+        cooling = convert(RealT, source.Lambda_tilde * max(p^2 - source.p_ambient^2, 0))
     else
         cooling = zero(RealT)
     end
@@ -105,8 +106,7 @@ end
 
 # Ambient state
 radiative_cooling = SourceTermRadiativeCooling(rho_ambient = rho_ambient(),
-                                               p_ambient = p_ambient(),
-                                               Lambda_tilde = 8.776)
+                                               p_ambient = p_ambient())
 
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
                                     boundary_conditions = boundary_conditions,
@@ -115,7 +115,7 @@ semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver;
 ###############################################################################
 # ODE solvers, callbacks etc.
 
-tspan = (0.0, 0.001)
+tspan = (0.0, 0.07)
 ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
