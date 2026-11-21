@@ -7,10 +7,11 @@ gamma = 5 / 3
 equations = CompressibleEulerEquations2D(gamma)
 
 # Initial condition adopted from
-# - Yong Liu, Jianfang Lu, and Chi-Wang Shu
-#   An oscillation free discontinuous Galerkin method for hyperbolic systems
-#   https://doi.org/10.1137/20M1354192
-# Mach = 2000 jet
+# - Xiangxiong Zhang and Chi-Wang Shu (2011)
+#   Positivity-preserving high order discontinuous Galerkin schemes
+#   for compressible Euler equations with source terms
+#   https://doi.org/10.1016/j.jcp.2010.10.036
+# Mach increased from 80 to about 2000
 function initial_condition_astro_jet(x, t, equations::CompressibleEulerEquations2D)
     RealT = eltype(x)
     @unpack gamma = equations
@@ -59,15 +60,20 @@ mesh = TreeMesh(coordinates_min, coordinates_max,
                 initial_refinement_level = 6,
                 periodicity = (false, true))
 
-# Simplified radiative cooling model of
-# - Y. Ha, C. Gardner, A. Gelb, C.-W. Shu (2005)
-#   Numerical simulation of high Mach number astrophysical jets with radiative cooling
-#   https://doi.org/10.1007/s10915-004-4786-4
+# Simplified radiative cooling model used in section 3.4 of 
+# - Xiangxiong Zhang and Chi-Wang Shu (2011)
+#   Positivity-preserving high order discontinuous Galerkin schemes
+#   for compressible Euler equations with source terms
+#   https://doi.org/10.1016/j.jcp.2010.10.036
 # The energy equation obtains the sink
 #   dE/dt = -Λ̃ (p² - p_a²) for T > T_a, and 0 otherwise,
 # with ambient pressure p_a and ambient temperature T_a.
 # Since T ∝ p / ρ, the condition T > T_a is evaluated as p / ρ > p_a / ρ_a.
-# Λ̃ = 8.776 is the value given by Ha et al. (2005) in their computational units.
+# Λ̃ = 8.776 is the value given in
+# - Y. Ha, C. Gardner, A. Gelb, C.-W. Shu (2005)
+#   Numerical simulation of high Mach number astrophysical jets with radiative cooling
+#   https://doi.org/10.1007/s10915-004-4786-4
+# in their computational units.
 struct SourceTermRadiativeCooling{RealT <: Real}
     Lambda_tilde::RealT
     p_ambient::RealT
@@ -151,6 +157,6 @@ callbacks = CallbackSet(summary_callback,
 
 ###############################################################################
 # run the simulation
-# use adaptive time stepping based on error estimates, time step roughly dt = 1e-7
+
 sol = solve(ode, SSPRK43(; stage_limiter! = positivity_limiter, thread = Trixi.Threaded());
             ode_default_options()..., callback = callbacks);
