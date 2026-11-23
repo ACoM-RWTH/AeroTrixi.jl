@@ -27,6 +27,7 @@ makedocs(modules = [AeroTrixi],
                  "Surface quantities" => "api/surface_quantities.md",
                  "Thermodynamics" => "api/thermodynamics.md",
                  "Multi-species equations" => "api/multispecies_equations.md",
+                 "AUSM+ flux" => "api/ausmplus.md",
                  "Trixi.jl-Gridap.jl bridge" => "api/trixi_gridap_bridge.md"
              ]
          ],

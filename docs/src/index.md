@@ -10,10 +10,6 @@ rarefied gases, for instance.
 
 ## Features
 
-- **Surface pressure and friction coefficients**: Compute and save pointwise aerodynamic coefficients along boundaries
-- **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
-- **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
-- **AUSM+ flux**: [`flux_ausmplus`](@ref) for Trixi.jl's `CompressibleEulerEquations1D`, an advection upstream splitting flux usable as surface flux or in finite volume schemes
 - **Surface pressure and friction coefficients**: the [`SurfacePointwiseCallback`](@ref)
   computes and saves pointwise aerodynamic coefficients along boundaries, such as
   [`SurfacePressureCoefficient`](@ref) and [`SurfaceFrictionCoefficient`](@ref)
@@ -27,6 +23,7 @@ rarefied gases, for instance.
   thermodynamic data, with the entropy-conservative flux [`flux_oblapenko_etal`](@ref) and
   its faster approximation [`flux_oblapenko_etal_taylor`](@ref); chemical reactions are
   possible via source terms (see [Multi-species equations](api/multispecies_equations.md)).
+- **AUSM+ flux**: [`flux_ausmplus`](@ref) for Trixi.jl's `CompressibleEulerEquations1D`, an advection upstream splitting flux usable as surface flux or in finite volume schemes
 - **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with
   Gridap.jl, solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with
   `polydeg = 2` and Q2 elements), with sources from and results written into the DG
