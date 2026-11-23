@@ -147,25 +147,28 @@ lift_coefficient_shear_force = AnalysisSurfaceIntegral(force_boundary_names,
 ###############################################################################
 # AeroTrixi addition
 
-friction_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfaceFrictionCoefficient(rho_inf(),
-                                                                           u_inf(equations)))
+friction_coefficient = SurfacePointwise(force_boundary_names,
+                                        SurfaceFrictionCoefficient(rho_inf(),
+                                                                   u_inf(equations)))
 
-pressure_coefficient = AnalysisSurfacePointwise(force_boundary_names,
-                                                SurfacePressureCoefficient(p_inf(),
-                                                                           rho_inf(),
-                                                                           u_inf(equations)))
+pressure_coefficient = SurfacePointwise(force_boundary_names,
+                                        SurfacePressureCoefficient(p_inf(),
+                                                                   rho_inf(),
+                                                                   u_inf(equations)))
 
-analysis_callback = AeroTrixi.AnalysisCallback(semi, interval = analysis_interval,
-                                               output_directory = "out",
-                                               save_analysis = true,
-                                               analysis_errors = Symbol[],
-                                               analysis_integrals = (drag_coefficient,
-                                                                     lift_coefficient,
-                                                                     drag_coefficient_shear_force,
-                                                                     lift_coefficient_shear_force),
-                                               analysis_pointwise = (friction_coefficient,
-                                                                     pressure_coefficient))
+analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
+                                     output_directory = "out",
+                                     save_analysis = true,
+                                     analysis_errors = Symbol[],
+                                     analysis_integrals = (drag_coefficient,
+                                                           lift_coefficient,
+                                                           drag_coefficient_shear_force,
+                                                           lift_coefficient_shear_force))
+
+# save the friction and the pressure coefficient at all surface nodes of the airfoil
+surface_pointwise_callback = SurfacePointwiseCallback(semi, friction_coefficient,
+                                                      pressure_coefficient;
+                                                      interval = analysis_interval)
 
 ###############################################################################
 
@@ -176,7 +179,8 @@ save_solution = SaveSolutionCallback(interval = 500,
                                      save_final_solution = true,
                                      solution_variables = cons2prim)
 
-callbacks = CallbackSet(summary_callback, analysis_callback, alive_callback, save_solution)
+callbacks = CallbackSet(summary_callback, analysis_callback, surface_pointwise_callback,
+                        alive_callback, save_solution)
 
 ###############################################################################
 # run the simulation

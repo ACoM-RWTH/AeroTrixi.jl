@@ -7,7 +7,7 @@
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 **AeroTrixi.jl** is a package for high-fidelity aerodynamic simulations built on top of [Trixi.jl](https://github.com/trixi-framework/Trixi.jl).
-Currently, it extends Trixi.jl's capabilities with a specialized analysis callback for aerodynamic applications.
+It adds pointwise surface quantities for aerodynamic applications, thermodynamics and entropy-conservative fluxes for multi-species flows of calorically imperfect gases, and a bridge to continuous finite elements of [Gridap.jl](https://github.com/gridap/Gridap.jl) for hyperbolic systems coupled to elliptic equations.
 In the future, we plan to add more features for nonideal and rarefied gases, for instance.
 
 ## Features
@@ -16,6 +16,7 @@ In the future, we plan to add more features for nonideal and rarefied gases, for
 - **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
 - **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
 - **AUSM+ flux**: [`flux_ausmplus`](@ref) for Trixi.jl's `CompressibleEulerEquations1D`, an advection upstream splitting flux usable as surface flux or in finite volume schemes
+- **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with [Gridap.jl](https://github.com/gridap/Gridap.jl), solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with `polydeg = 2` and Q2 elements), with sources from and results written into the DG solution, once per time step or on each Runge-Kutta stage via [`GridapCallback`](@ref); for example, the Euler equations with an electrostatic potential, [`CompressibleEulerPoissonEquations2D`](@ref). See [the documentation of the bridge](docs/src/trixi_gridap_bridge.md)
 
 ## Installation
 
@@ -26,15 +27,17 @@ using Pkg
 Pkg.add("AeroTrixi")
 ```
 
-## Quick Start
+## Examples
 
-To get started, it is best to take a look at the examples.
-Currently, the additional functionality provided by AeroTrixi.jl is
+To get started, it is best to take a look at the examples in the folder returned by `examples_dir()`, which run with `trixi_include` like the examples of Trixi.jl:
 
-- the extended `AnalysisCallback` which can be used to compute pointwise aerodynamic coefficients along boundaries,
-such as `SurfacePressureCoefficient` and `SurfaceFrictionCoefficient`
-- the `ThermoData1T` type for tabulated thermodynamic data for multi-species flows in thermal equilibrium
-- the `CompressibleEulerEquationsMs1T2D` type for 2D multi-species flows of calorically imperfect gases in thermal equilibrium, which is based on tabulated thermodynamic data stored in `ThermoData1T`; an entropy-conservative flux `flux_oblapenko_etal` is provided, and chemical reactions are possible via source terms (see examples). A faster approximate version of the EC flux is available as `flux_oblapenko_etal_taylor`.
+| Feature | Examples |
+|---|---|
+| Aerodynamic flows and surface quantities | `p4est_2d_dgsem/elixir_euler_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_NACA0012airfoil_mach08.jl`, `p4est_3d_dgsem/elixir_euler_ONERA_M6_AVI.jl` (with surface coefficients), `p4est_3d_dgsem/elixir_euler_DPW3_wing.jl` |
+| Multi-species flows | `tree_2d_dgsem/elixir_eulermst1T_ec.jl` (entropy conservation), `tree_2d_dgsem/elixir_eulermst1T_chem.jl` (dissociation), `p4est_2d_dgsem/elixir_eulerms1T_1speciescylinder.jl`, `p4est_2d_dgsem/elixir_eulerms1T_2speciescylinder_chem.jl` (hypersonic cylinder) |
+| Trixi.jl-Gridap.jl bridge | `p4est_2d_dgsem/elixir_euler_poisson_blast_five_trees_amr.jl` |
+
+The [documentation](https://acom-rwth.github.io/AeroTrixi.jl/stable/) contains a guide to the Trixi.jl-Gridap.jl bridge and the API reference, grouped by topic.
 
 ## Credit
 

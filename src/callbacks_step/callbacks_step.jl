@@ -5,5 +5,6 @@
 @muladd begin
 #! format: noindent
 
-include("analysis.jl")
+include("surface_pointwise_callback.jl")
+include("gridap_callback.jl")
 end # @muladd
