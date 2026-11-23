@@ -1,7 +1,7 @@
 name = "AeroTrixi"
 uuid = "96ec6574-3e85-11f1-3b3c-2957db4b7004"
-version = "0.4.1"
-authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko"]
+version = "0.5.1"
+authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko", "Manuel Torrilhon"]
 
 [deps]
 FlowRef = "e2f09e9e-4b11-4a24-9e3f-a1cd38a03ba0"
@@ -10,8 +10,15 @@ MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Trixi = "a7f1ee26-1774-49b1-8366-f1abc58fbfcb"
 
+[weakdeps]
+Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
+
+[extensions]
+AeroTrixiGridapExt = "Gridap"
+
 [compat]
 FlowRef = "0.2.0"
+Gridap = "0.20"
 LinearAlgebra = "1"
 MuladdMacro = "0.2.4"
 StaticArrays = "1.9.8"

@@ -8,8 +8,10 @@ using AeroTrixi
     include(joinpath(@__DIR__, "test_spectra.jl"))
     include(joinpath(@__DIR__, "test_thermo_interpolation.jl"))
     include(joinpath(@__DIR__, "test_euler_ms1T_2D.jl"))
+    include(joinpath(@__DIR__, "test_surface_pointwise.jl"))
     include(joinpath(@__DIR__, "test_tree.jl"))
     include(joinpath(@__DIR__, "test_p4est.jl"))
+    include(joinpath(@__DIR__, "test_trixi_gridap_bridge.jl"))
 end
 
 @testset "Aqua" begin

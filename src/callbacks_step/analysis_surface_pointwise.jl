@@ -9,7 +9,7 @@
 # pointwise surface forces.
 
 """
-    AnalysisSurfacePointwise{Variable, NBoundaries}(boundary_symbol_or_boundary_symbols,
+    SurfacePointwise{Variable, NBoundaries}(boundary_symbol_or_boundary_symbols,
                                                     variable, output_directory = "out")
 
 This struct is used to compute pointwise surface values of a quantity of interest `variable` alongside
@@ -25,14 +25,14 @@ A single boundary name can also be supplied, e.g. `boundary_symbols = (:AirfoilT
 - `variable::Variable`: Quantity of interest, like lift or drag
 - `output_directory = "out"`: Directory where the pointwise value files are stored.
 """
-struct AnalysisSurfacePointwise{Variable, NBoundaries}
+struct SurfacePointwise{Variable, NBoundaries}
     variable::Variable # Quantity of interest, like lift or drag
     boundary_symbols::NTuple{NBoundaries, Symbol} # Name(s) of the boundary/boundaries
     output_directory::String
 
-    function AnalysisSurfacePointwise(boundary_symbols::NTuple{NBoundaries, Symbol},
-                                      variable,
-                                      output_directory = "out") where {NBoundaries}
+    function SurfacePointwise(boundary_symbols::NTuple{NBoundaries, Symbol},
+                              variable,
+                              output_directory = "out") where {NBoundaries}
         return new{typeof(variable), NBoundaries}(variable, boundary_symbols,
                                                   output_directory)
     end
@@ -61,7 +61,7 @@ C_p \\coloneqq \\frac{p - p_{\\infty}}
                      {0.5 \\rho_{\\infty} U_{\\infty}^2}
 ```
 based on the pressure distribution along a boundary.
-Supposed to be used in conjunction with [`AnalysisSurfacePointwise`](@ref)
+Supposed to be used in conjunction with [`SurfacePointwise`](@ref)
 which stores the boundary information and semidiscretization.
 
 - `p_inf::Real`: Free-stream pressure
@@ -81,7 +81,7 @@ C_f \\coloneqq \\frac{\\boldsymbol \\tau_w  \\boldsymbol n^\\perp}
                      {0.5 \\rho_{\\infty} U_{\\infty}^2 L_{\\infty}}
 ```
 based on the wall shear stress vector ``\\tau_w`` along a boundary.
-Supposed to be used in conjunction with [`AnalysisSurfacePointwise`](@ref)
+Supposed to be used in conjunction with [`SurfacePointwise`](@ref)
 which stores the boundary information and semidiscretization.
 
 - `rho_inf::Real`: Free-stream density
@@ -110,7 +110,7 @@ varname(friction_coefficient::SurfaceFrictionCoefficient) = "CF_x"
 # time `t` and iteration `iter` to disk.
 # The file is written to the `output_directory` with name `varname` in HDF5 (.h5) format.
 # The latter two are retrieved from the `surface_variable`,
-# an instantiation of `AnalysisSurfacePointwise`.
+# an instantiation of `SurfacePointwise`.
 function save_pointwise_file(output_directory, varname,
                              element_indices, node_counter, coordinates, values,
                              t, iter)
@@ -132,17 +132,17 @@ function save_pointwise_file(output_directory, varname,
     end
 end
 
-function pretty_form_ascii(::AnalysisSurfacePointwise{<:SurfacePressureCoefficient{<:Any}})
+function pretty_form_ascii(::SurfacePointwise{<:SurfacePressureCoefficient{<:Any}})
     "CP(x)"
 end
-function pretty_form_utf(::AnalysisSurfacePointwise{<:SurfacePressureCoefficient{<:Any}})
+function pretty_form_utf(::SurfacePointwise{<:SurfacePressureCoefficient{<:Any}})
     "CP(x)"
 end
 
-function pretty_form_ascii(::AnalysisSurfacePointwise{<:SurfaceFrictionCoefficient{<:Any}})
+function pretty_form_ascii(::SurfacePointwise{<:SurfaceFrictionCoefficient{<:Any}})
     "CF(x)"
 end
-function pretty_form_utf(::AnalysisSurfacePointwise{<:SurfaceFrictionCoefficient{<:Any}})
+function pretty_form_utf(::SurfacePointwise{<:SurfaceFrictionCoefficient{<:Any}})
     "CF(x)"
 end
 
