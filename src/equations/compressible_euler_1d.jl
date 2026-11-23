@@ -152,7 +152,6 @@ end
     return min(a_tilde_ll, a_tilde_rr)
 end
 
-
 """
     FluxAUSMPlusUp(; mach_inf = 1, K_p = 0.25, K_u = 0.75, sigma = 1)
 
