@@ -2,6 +2,7 @@ module TestExamplesTreeMesh1D
 
 using Test
 using Trixi
+using AeroTrixi: flux_ausmplusup
 
 include("test_trixi.jl")
 
@@ -43,6 +44,27 @@ isdir(outdir) && rm(outdir, recursive = true)
                                 0.0004961642897844953,
                                 0.0002628104038207013,
                                 0.0038776069262151935
+                            ])
+
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
+    end
+
+    @trixi_testset "elixir_navierstokes_convergence_periodic_ausmplus.jl with AUSM+-up" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_navierstokes_convergence_periodic_ausmplus.jl"),
+                            surface_flux=flux_ausmplusup,
+                            l2=[
+                                0.00011262232635716657,
+                                4.7089065955241156e-5,
+                                0.00031562395112728187
+                            ],
+                            linf=[
+                                0.0005877329087469185,
+                                0.00027292465552886114,
+                                0.0021671925851407536
                             ])
 
         # Ensure that we do not have excessive memory allocations
