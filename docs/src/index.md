@@ -23,6 +23,7 @@ rarefied gases, for instance.
   thermodynamic data, with the entropy-conservative flux [`flux_oblapenko_etal`](@ref) and
   its faster approximation [`flux_oblapenko_etal_taylor`](@ref); chemical reactions are
   possible via source terms (see [Multi-species equations](api/multispecies_equations.md)).
+- **AUSM+ flux**: [`flux_ausmplus`](@ref) for Trixi.jl's `CompressibleEulerEquations1D`, an advection upstream splitting flux usable as surface flux or in finite volume schemes
 - **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with
   Gridap.jl, solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with
   `polydeg = 2` and Q2 elements), with sources from and results written into the DG

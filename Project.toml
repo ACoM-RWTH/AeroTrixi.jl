@@ -1,6 +1,6 @@
 name = "AeroTrixi"
 uuid = "96ec6574-3e85-11f1-3b3c-2957db4b7004"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["Arpit Babbar", "Daniel Doehring", "Georgii Oblapenko", "Manuel Torrilhon"]
 
 [deps]
@@ -22,5 +22,5 @@ Gridap = "0.20"
 LinearAlgebra = "1"
 MuladdMacro = "0.2.4"
 StaticArrays = "1.9.8"
-Trixi = "0.17.2"
+Trixi = "0.18"
 julia = "1.10"
