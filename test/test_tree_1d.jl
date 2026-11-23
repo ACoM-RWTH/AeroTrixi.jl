@@ -12,20 +12,19 @@ outdir = "out"
 isdir(outdir) && rm(outdir, recursive = true)
 
 @testset "TreeMesh1D" begin
-    @trixi_testset "elixir_euler_sedov_blast_wave_ausmplus.jl" begin
+    @trixi_testset "elixir_euler_modified_sod_ausmplus.jl" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
-                                     "elixir_euler_sedov_blast_wave_ausmplus.jl"),
+                                     "elixir_euler_modified_sod_ausmplus.jl"),
                             l2=[
-                                0.8628124802061918,
-                                0.557396918783315,
-                                0.9099876895134151
+                                0.2606060414022102,
+                                0.4488446633828044,
+                                0.9203592394635516
                             ],
                             linf=[
-                                3.278024820231943,
-                                2.2888170680360536,
-                                2.4304337465927164
-                            ],
-                            tspan=(0.0, 1.0))
+                                0.5878413702642901,
+                                0.8106909192141609,
+                                1.7674407034136164
+                            ])
 
         # Ensure that we do not have excessive memory allocations
         # (e.g., from type instabilities)
