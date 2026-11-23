@@ -9,6 +9,7 @@ In the future, we plan to add more features for nonideal and rarefied gases, for
 - **Surface pressure and friction coefficients**: Compute and save pointwise aerodynamic coefficients along boundaries
 - **Thermodynamic data**: tabulated internal energies and specific heats with interpolation and temperature inversion routines for multi-species flows via the [`ThermoData1T`](@ref) type
 - **Entropy-conservative/stable fluxes for non-calorically perfect multi-species flows**: [`CompressibleEulerEquationsMs1T2D`](@ref) type for 2D multi-species equations, entropy conservative fluxes, based on tabulated thermodynamic data
+- **AUSM+ flux**: [`flux_ausmplus`](@ref) for Trixi.jl's `CompressibleEulerEquations1D`, an advection upstream splitting flux usable as surface flux or in finite volume schemes
 
 ## Installation
 

@@ -64,5 +64,6 @@ export e_vibr_from_array, c_vibr_from_array, generate_e_c_vibr_from_array
 export LinearInterpolation, CvOffset, NoCvOffset
 export CompressibleEulerEquationsMs1T2D
 export flux_oblapenko_etal, flux_oblapenko_etal_taylor
+export flux_ausmplus
 
 end
