@@ -1,0 +1,50 @@
+#!/bin/bash
+# Generate an all-quad Abaqus mesh (`.inp`, boundaries as node sets `airfoil`
+# and `farfield`) of the ONERA OAT 15A airfoil for Trixi.jl's `P4estMesh` with
+# cfMesh (https://cfmesh.com, tested with the command-line tools of CF-MESH+ 5.4).
+#
+# Usage:
+#   CFMESH_BIN=/path/to/cfMesh/bin ./Allmesh [case_directory]
+#
+# The case directory (default: ./out_oat15a) is created if necessary and
+# receives all generated files; the final mesh is <case_directory>/oat15a_airfoil.inp.
+# Requires python3 with numpy and scipy.
+#
+# Steps:
+#   1) generate_geometry.py: airfoil + far-field circle as a "ribbon" STL
+#   2) surfaceFeatureEdges: convert to cfMesh's .fms format, mark sharp edges
+#   3) cartesian2DMesh: coarse 2D base mesh with boundary layers (system/meshDict)
+#   4) polymesh_to_inp.py: split all cells into conforming quads and write .inp
+set -e
+
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+case_dir=$(mkdir -p "${1:-out_oat15a}" && cd "${1:-out_oat15a}" && pwd)
+CFMESH_BIN=${CFMESH_BIN:-$HOME/Software/CreativeFields/cfMesh/Mesher/bin}
+# cfMesh is OpenMP-parallel; multi-threaded runs produce valid but differently
+# numbered meshes. A single thread makes the mesh reproducible (and takes ~1 s).
+export OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+
+for tool in surfaceFeatureEdges cartesian2DMesh; do
+    if [ ! -x "$CFMESH_BIN/$tool" ]; then
+        echo "Error: $CFMESH_BIN/$tool not found. Set CFMESH_BIN to the cfMesh bin directory." >&2
+        exit 1
+    fi
+done
+
+mkdir -p "$case_dir/system"
+cp "$script_dir"/system/* "$case_dir/system/"
+cd "$case_dir"
+
+python3 "$script_dir/generate_geometry.py" \
+    "$script_dir/oat15a_coordinates_c015.dat" oat15a_airfoil.stl
+
+"$CFMESH_BIN/surfaceFeatureEdges" -angle 30 oat15a_airfoil.stl oat15a_airfoil.fms \
+    > log.surfaceFeatureEdges 2>&1
+
+rm -rf constant/polyMesh
+"$CFMESH_BIN/cartesian2DMesh" > log.cartesian2DMesh 2>&1
+tail -n 3 log.cartesian2DMesh
+
+# nLayers and thicknessRatio must match the boundary layer settings in system/meshDict
+python3 "$script_dir/polymesh_to_inp.py" . oat15a_airfoil.inp 12 1.44
+echo "Mesh: $case_dir/oat15a_airfoil.inp"
