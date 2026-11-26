@@ -83,7 +83,6 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 # (first layer height ~2.5e-5 chord lengths) in a circular domain with radius 50 chord
 # lengths, generated with cfMesh by `utils/cfmesh/Allmesh`. The boundaries are given as
 # node sets `airfoil` and `farfield`.
-# TODO: Replace the URL below by the URL of the uploaded mesh file before merging.
 mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/148f027c7f59239b9983e06e5c16f7c2/raw/d32e626490c042a6350ff692b87d038f19ae02e4/oat15a_airfoil.inp",
                            joinpath(@__DIR__, "oat15a_airfoil.inp"))
 
