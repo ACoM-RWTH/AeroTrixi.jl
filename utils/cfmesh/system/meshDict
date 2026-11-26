@@ -6,7 +6,8 @@
   cell once into quads (removing the hanging-node polygons of the octree),
   which halves all cell sizes. All sizes below are therefore twice the target
   sizes (surface cells 0.003125 c, far-field cells 6.4 c); the layer settings
-  are chosen such that the split layers have the growth ratio sqrt(1.44) = 1.2.
+  are chosen such that the split layers have the growth ratio sqrt(1.44) = 1.2
+  (10 layers here -> 20 layers in the final mesh).
 
   Units: chord c = 1, leading edge at (0,0), trailing edge at x = 1.
 
@@ -113,21 +114,33 @@ objectRefinements
 //
 // How layers are built: cfMesh inserts one layer of cells at the boundary
 // (thickness T ~ boundary cell size; here T ~ 4.6e-3 c) and splits it into
-// nLayers layers with ratio r: first layer = T (r - 1)/(r^n - 1).
+// nLayers layers with growth ratio r = thicknessRatio:
+//     first layer height = T (r - 1)/(r^n - 1).
+//
+// !!! The first layer height CANNOT be prescribed (neither can the total
+// !!! layer thickness T). It is a result of the cell size at the airfoil
+// !!! (which sets T), nLayers, and thicknessRatio. To change it, adjust these
+// !!! parameters and check the first layer height reported by
+// !!! polymesh_to_inp.py (or check_mesh.py for the base mesh).
+//
 // polymesh_to_inp.py splits each layer once more at the geometric point
-// 1/(1 + sqrt(r)), giving 2n layers with ratio sqrt(r):
-//     n = 12, r = 1.44  ->  24 layers, ratio 1.2, first layer ~1e-5 c,
+// 1/(1 + sqrt(r)), which doubles the number of layers and gives the growth
+// ratio sqrt(r). With the settings below,
+//     nLayers = 10, r = 1.44  ->  20 layers after splitting, ratio 1.2,
+//                                 first layer height ~2.5e-5 c,
 // and a jump of the cell height from the last layer to the core cells of ~3
-// (a direct mesh with 21 layers and ratio 1.2 gives a jump of ~6, since the
-// jump is roughly r/(r - 1) for many layers).
+// (a direct mesh with ratio 1.2 gives a jump of ~6, since the jump is
+// roughly r/(r - 1) for many layers).
+// Allmesh reads nLayers and thicknessRatio from this file and passes them
+// to polymesh_to_inp.py.
 boundaryLayers
 {
     patchBoundaryLayers
     {
         airfoil
         {
-            nLayers                 12;
-            thicknessRatio          1.44;
+            nLayers                 10;     // -> 20 layers after splitting
+            thicknessRatio          1.44;   // -> 1.2 after splitting
             allowDiscontinuity      0;
         }
     }

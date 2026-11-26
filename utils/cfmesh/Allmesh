@@ -45,6 +45,14 @@ rm -rf constant/polyMesh
 "$CFMESH_BIN/cartesian2DMesh" > log.cartesian2DMesh 2>&1
 tail -n 3 log.cartesian2DMesh
 
-# nLayers and thicknessRatio must match the boundary layer settings in system/meshDict
-python3 "$script_dir/polymesh_to_inp.py" . oat15a_airfoil.inp 12 1.44
+# The converter needs the boundary layer settings of the base mesh to split the
+# layers geometrically; read them from system/meshDict
+n_layers=$(sed -n 's/^[[:space:]]*nLayers[[:space:]]\{1,\}\([0-9]\{1,\}\);.*/\1/p' system/meshDict)
+ratio=$(sed -n 's/^[[:space:]]*thicknessRatio[[:space:]]\{1,\}\([0-9.eE+-]\{1,\}\);.*/\1/p' system/meshDict)
+if [ "$(echo "$n_layers" | wc -w)" -ne 1 ] || [ "$(echo "$ratio" | wc -w)" -ne 1 ]; then
+    echo "Error: expected exactly one nLayers and one thicknessRatio entry in system/meshDict" >&2
+    exit 1
+fi
+echo "Boundary layers of the base mesh: nLayers = $n_layers, thicknessRatio = $ratio"
+python3 "$script_dir/polymesh_to_inp.py" . oat15a_airfoil.inp "$n_layers" "$ratio"
 echo "Mesh: $case_dir/oat15a_airfoil.inp"

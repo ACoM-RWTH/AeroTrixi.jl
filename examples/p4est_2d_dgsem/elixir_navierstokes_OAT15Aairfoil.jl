@@ -84,10 +84,10 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 
 ###############################################################################
 
-# Mesh with 38312 straight-sided quadrilaterals and 24 boundary layers (first layer height
-# ~1e-5 chord lengths) in a circular domain with radius 50 chord lengths, generated with
-# cfMesh by `utils/cfmesh/Allmesh`. The boundaries are given as node sets `airfoil` and
-# `farfield`.
+# Mesh with 35368 straight-sided quadrilaterals and 20 boundary layers with growth ratio 1.2
+# (first layer height ~2.5e-5 chord lengths) in a circular domain with radius 50 chord
+# lengths, generated with cfMesh by `utils/cfmesh/Allmesh`. The boundaries are given as
+# node sets `airfoil` and `farfield`.
 # TODO: Replace the URL below by the URL of the uploaded mesh file before merging.
 mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/REPLACE_WITH_GIST_ID/raw/oat15a_airfoil.inp",
                            joinpath(@__DIR__, "oat15a_airfoil.inp"))

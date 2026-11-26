@@ -30,7 +30,7 @@ Splitting details
 Usage:
     python3 polymesh_to_inp.py <case_dir> <output.inp> [nLayers] [thicknessRatio]
 e.g.
-    python3 polymesh_to_inp.py out_oat15a oat15a_airfoil.inp 12 1.44
+    python3 polymesh_to_inp.py out_oat15a oat15a_airfoil.inp 10 1.44
 
 In Trixi.jl:
     mesh = P4estMesh{2}("oat15a_airfoil.inp", boundary_symbols = [:airfoil, :farfield])
@@ -46,7 +46,7 @@ import generate_geometry as geo  # noqa: E402
 
 case = sys.argv[1]
 out_file = sys.argv[2]
-n_layers = int(sys.argv[3]) if len(sys.argv) > 3 else 12
+n_layers = int(sys.argv[3]) if len(sys.argv) > 3 else 10
 ratio = float(sys.argv[4]) if len(sys.argv) > 4 else 1.44
 coord_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "oat15a_coordinates_c015.dat")
@@ -155,6 +155,14 @@ print(f"layer columns: {len(column_of_wall_edge)}, "
       f"min/max depth {min(map(len, column_of_wall_edge.values()))}/"
       f"{max(map(len, column_of_wall_edge.values()))}, "
       f"orientation conflicts: {n_conflicts}")
+# The first layer height is a result of cfMesh's layer generation and the
+# geometric splitting below; it cannot be prescribed.
+first_layer = np.array([w_split * col[0][1] for col in column_of_wall_edge.values() if col])
+total_layer = np.array([col[-1][1] for col in column_of_wall_edge.values() if col])
+print(f"after splitting: {2 * n_layers} layers with ratio {np.sqrt(ratio):.4g}, "
+      f"first layer height min {first_layer.min():.2e}, "
+      f"median {np.median(first_layer):.2e}, max {first_layer.max():.2e}; "
+      f"total layer thickness median {np.median(total_layer):.2e}")
 
 # =============================================================================
 # Exact geometry for boundary nodes

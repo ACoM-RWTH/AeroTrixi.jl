@@ -3,7 +3,7 @@
 Basic quality check of a 2D cfMesh airfoil mesh (ASCII OpenFOAM polyMesh),
 as a substitute for OpenFOAM's checkMesh, which is not part of CF-MESH+.
 Useful to inspect the cfMesh base mesh before conversion with
-polymesh_to_inp.py (pass nLayers of system/meshDict, i.e., 12).
+polymesh_to_inp.py (pass nLayers of system/meshDict, i.e., 10).
 
 Reports
   - number of cells and their polygon types (quads; pentagons/hexagons occur
@@ -24,7 +24,7 @@ from collections import Counter
 import numpy as np
 
 case = sys.argv[1] if len(sys.argv) > 1 else "."
-n_layers = int(sys.argv[2]) if len(sys.argv) > 2 else 24
+n_layers = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 d = case + "/constant/polyMesh/"
 
 

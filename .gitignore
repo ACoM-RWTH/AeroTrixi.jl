@@ -5,3 +5,4 @@ Manifest.toml
 *.inp
 *.h5
 
+__pycache__/

@@ -4,9 +4,9 @@ This directory contains a complete workflow to generate a 2D all-quadrilateral
 mesh with boundary layers around the ONERA OAT 15A airfoil with
 [cfMesh](https://cfmesh.com) and to convert it to an Abaqus `.inp` file that can
 be read by Trixi.jl's `P4estMesh`. The boundaries are stored as node sets
-`airfoil` and `farfield`. The workflow is explained in the tutorial
-"`P4estMesh` from cfMesh" of the Trixi.jl documentation and is used for the
-elixir `examples/p4est_2d_dgsem/elixir_navierstokes_OAT15Aairfoil.jl`.
+`airfoil` and `farfield`. The workflow is explained on the documentation page
+"Boundary-layer meshes with cfMesh" (`docs/src/cfmesh_meshes.md`) and is used
+for the elixir `examples/p4est_2d_dgsem/elixir_navierstokes_OAT15Aairfoil.jl`.
 
 Requirements: the cfMesh command-line tools `surfaceFeatureEdges` and
 `cartesian2DMesh` (tested with CF-MESH+ 5.4), and Python 3 with NumPy and SciPy
@@ -30,6 +30,14 @@ mesh = P4estMesh{2}("out_oat15a/oat15a_airfoil.inp",
 | `system/controlDict`, `fvSchemes`, `fvSolution` | Minimal dictionaries required by the OpenFOAM-based cfMesh tools |
 | `polymesh_to_inp.py` | Converts the cfMesh (OpenFOAM `polyMesh`) mesh to conforming quads in Abaqus `.inp` format |
 | `check_mesh.py` | Optional quality check of the cfMesh base mesh (substitute for OpenFOAM's `checkMesh`) |
+| `inp_to_msh.py` | Converts a 2D Abaqus `.inp` mesh with node sets to the Gmsh format (MSH 2.2, ASCII) for inspection, e.g., `python3 inp_to_msh.py out_oat15a/oat15a_airfoil.inp` |
+
+**Note:** the height of the first boundary layer cannot be prescribed with
+cfMesh's command-line tools. It results from the cell size at the airfoil, the
+number of layers, and their growth ratio (see `system/meshDict`); the value is
+reported by `polymesh_to_inp.py`. The current settings give 10 layers with ratio
+1.44 in the base mesh, i.e., 20 layers with ratio 1.2 and a first layer height
+of about 2.5e-5 chord lengths in the final mesh.
 
 cfMesh meshes contain polygonal cells with hanging nodes at the transitions
 between refinement levels. `polymesh_to_inp.py` therefore splits every cell
