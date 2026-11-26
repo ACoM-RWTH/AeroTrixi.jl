@@ -55,6 +55,28 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
     end
 
+    @trixi_testset "elixir_navierstokes_OAT15Aairfoil.jl" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_navierstokes_OAT15Aairfoil.jl"),
+                            l2=[
+                                4.981963796228579e-6,
+                                4.034162971055166e-6,
+                                4.329786298513435e-6,
+                                1.3822825814867107e-5
+                            ],
+                            linf=[
+                                0.9745478911160532,
+                                0.8941385997057405,
+                                0.6585199661823941,
+                                2.809162361107464
+                            ],
+                            tspan=(0.0, 5e-6))
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities)
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
+    end
+
     @trixi_testset "elixir_euler_poisson_blast_five_trees_amr.jl" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_euler_poisson_blast_five_trees_amr.jl"),

@@ -24,6 +24,11 @@ rarefied gases, for instance.
   its faster approximation [`flux_oblapenko_etal_taylor`](@ref); chemical reactions are
   possible via source terms (see [Multi-species equations](api/multispecies_equations.md)).
 - **AUSM+ and AUSM+-up fluxes**: [`flux_ausmplus`](@ref) and its all-speed extension [`FluxAUSMPlusUp`](@ref) (default instance `flux_ausmplusup`) for Trixi.jl's `CompressibleEulerEquations1D`, advection upstream splitting fluxes usable as surface flux or in finite volume schemes
+- **Boundary-layer meshes with cfMesh**: scripts in `utils/cfmesh` to generate
+  all-quadrilateral airfoil meshes with boundary layers for the `P4estMesh` of Trixi.jl
+  with [cfMesh](https://cfmesh.com), demonstrated for the ONERA OAT 15A airfoil, and to
+  convert Abaqus `.inp` meshes to the Gmsh format for inspection (see the
+  [guide](cfmesh_meshes.md)).
 - **Trixi.jl-Gridap.jl bridge**: continuous finite element problems, assembled with
   Gridap.jl, solved on the adaptive `P4estMesh` of a DG simulation (2D, DG with
   `polydeg = 2` and Q2 elements), with sources from and results written into the DG
@@ -47,14 +52,15 @@ To get started, it is best to take a look at the examples in the folder returned
 
 | Feature | Examples |
 |---|---|
-| Aerodynamic flows and surface quantities | `p4est_2d_dgsem/elixir_euler_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_NACA0012airfoil_mach08.jl`, `p4est_3d_dgsem/elixir_euler_ONERA_M6_AVI.jl` (with surface coefficients), `p4est_3d_dgsem/elixir_euler_DPW3_wing.jl` |
+| Aerodynamic flows and surface quantities | `p4est_2d_dgsem/elixir_euler_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_OAT15Aairfoil.jl` (transonic buffet conditions, mesh with boundary layers), `p4est_3d_dgsem/elixir_euler_ONERA_M6_AVI.jl` (with surface coefficients), `p4est_3d_dgsem/elixir_euler_DPW3_wing.jl` |
 | Multi-species flows | `tree_2d_dgsem/elixir_eulermst1T_ec.jl` (entropy conservation), `tree_2d_dgsem/elixir_eulermst1T_chem.jl` (dissociation), `p4est_2d_dgsem/elixir_eulerms1T_1speciescylinder.jl`, `p4est_2d_dgsem/elixir_eulerms1T_2speciescylinder_chem.jl` (hypersonic cylinder) |
 | Trixi.jl-Gridap.jl bridge | `p4est_2d_dgsem/elixir_euler_poisson_blast_five_trees_amr.jl` |
 
 ## Documentation
 
 The [guide to the Trixi.jl-Gridap.jl bridge](trixi_gridap_bridge.md) explains its
-foundations and usage. The [API Reference](api.md) documents all functions and types,
+foundations and usage. The [guide to boundary-layer meshes with cfMesh](cfmesh_meshes.md)
+explains the mesh generation for the OAT 15A example. The [API Reference](api.md) documents all functions and types,
 grouped by topic.
 
 ## Credit

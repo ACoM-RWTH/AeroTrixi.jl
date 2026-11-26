@@ -1,0 +1,27 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  controlDict for the cfMesh tools: cartesian2DMesh is an OpenFOAM application
+  and needs this file with the following entries (fvSchemes and fvSolution are
+  not required). No solver is run.
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Required by OpenFOAM's time control, not used by the mesher
+deltaT            1;
+writeControl      timeStep;
+writeInterval     1;
+
+// The mesh is written as ASCII polyMesh, which polymesh_to_inp.py reads.
+// The precision is essential: with the default of 6 significant digits, the
+// node coordinates are rounded to ~1e-5 near the airfoil, which destroys the
+// thin boundary layers (first layer height ~1e-5 chord lengths).
+writeFormat       ascii;
+writePrecision    12;
+
+// ************************************************************************* //

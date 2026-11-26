@@ -1,0 +1,175 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  cfMesh (CF-MESH+ 5.4) dictionary for cartesian2DMesh:
+  ONERA OAT 15A airfoil in a circular far field (radius 50 chords).
+
+  This is the COARSE base mesh for Trixi.jl: polymesh_to_inp.py splits every
+  cell once into quads (removing the hanging-node polygons of the octree),
+  which halves all cell sizes. All sizes below are therefore twice the target
+  sizes (surface cells 0.003125 c, far-field cells 6.4 c); the layer settings
+  are chosen such that the split layers have the growth ratio sqrt(1.44) = 1.2
+  (10 layers here -> 20 layers in the final mesh).
+
+  Units: chord c = 1, leading edge at (0,0), trailing edge at x = 1.
+
+  Octree cell sizes are maxCellSize / 2^n. With maxCellSize = 12.8:
+    n :    0    1    2    3    4    5    6    7     8      9      10       11
+    h : 12.8  6.4  3.2  1.6  0.8  0.4  0.2  0.1  0.05  0.025  0.0125  0.00625
+  (sizes in comments below: coarse -> after splitting)
+  Refinement is given as additionalRefinementLevels n relative to maxCellSize
+  (cellSize values that are exact powers of two get rounded one level finer).
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      meshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Ribbon geometry (airfoil + far field), created by generate_geometry.py and
+// converted to .fms with feature edges by surfaceFeatureEdges (see Allmesh)
+surfaceFile     "oat15a_airfoil.fms";
+
+// Far-field cell size
+maxCellSize     12.8;   // -> 6.4
+
+// ----------------------------------------------------------------------------
+// Surface refinement
+// ----------------------------------------------------------------------------
+localRefinement
+{
+    airfoil
+    {
+        additionalRefinementLevels 11;  // h = 0.00625 -> 0.003125
+        // keep the finest level in a band around the airfoil before coarsening
+        refinementThickness 0.04;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Volume refinement: nested circles (spheres cut by the x-y plane) centred at
+// mid-chord. They approximate a linear growth of the (final) cell size with
+// the distance d to the airfoil, h(d) ~ 3.3e-3 + 0.13 d, since the 2:1
+// octree grading alone would coarsen too quickly.
+// ----------------------------------------------------------------------------
+objectRefinements
+{
+    nearBody    // d ~ 0.25
+    {
+        type        sphere;
+        centre      (0.5 0 0);
+        radius      0.75;
+        additionalRefinementLevels 8;   // h = 0.05 -> 0.025
+    }
+
+    nearField   // d ~ 1
+    {
+        type        sphere;
+        centre      (0.5 0 0);
+        radius      1.5;
+        additionalRefinementLevels 6;   // h = 0.2 -> 0.1
+    }
+
+    midField    // d ~ 4
+    {
+        type        sphere;
+        centre      (0.5 0 0);
+        radius      4.5;
+        additionalRefinementLevels 4;   // h = 0.8 -> 0.4
+    }
+
+    farField    // d ~ 10
+    {
+        type        sphere;
+        centre      (0.5 0 0);
+        radius      10.5;
+        additionalRefinementLevels 2;   // h = 3.2 -> 1.6
+    }
+
+    // Optional wake refinement. Uncomment to resolve the wake behind the
+    // trailing edge.
+    // wake
+    // {
+    //     type        box;
+    //     centre      (2.0 0 0);
+    //     lengthX     2.2;
+    //     lengthY     0.4;
+    //     lengthZ     2.0;
+    //     additionalRefinementLevels 9;   // h = 0.025 -> 0.0125
+    // }
+}
+
+// ----------------------------------------------------------------------------
+// Boundary-layer (prism / inflation) layers
+// ----------------------------------------------------------------------------
+// NOTE: The command-line mesher of CF-MESH+ 5.4 (Mesher/lib/libmeshLibrary.so)
+// implements only the layer keywords of the open-source cfMesh (nLayers,
+// thicknessRatio, maxFirstLayerThickness, allowDiscontinuity, ...). The
+// keywords firstLayerThickness, totalLayerThickness, nOuterLayers,
+// desiredYPlus and inletOutletPatches/generateLayer of the CF-MESH+ manual
+// are silently ignored by it. maxFirstLayerThickness is not useful here: it
+// keeps the ratio for the inner layers and puts the remaining thickness into
+// the last layer.
+//
+// How layers are built: cfMesh inserts one layer of cells at the boundary
+// (thickness T ~ boundary cell size; here T ~ 4.6e-3 c) and splits it into
+// nLayers layers with growth ratio r = thicknessRatio:
+//     first layer height = T (r - 1)/(r^n - 1).
+//
+// !!! The first layer height CANNOT be prescribed (neither can the total
+// !!! layer thickness T). It is a result of the cell size at the airfoil
+// !!! (which sets T), nLayers, and thicknessRatio. To change it, adjust these
+// !!! parameters and check the first layer height reported by
+// !!! polymesh_to_inp.py (or check_mesh.py for the base mesh).
+//
+// polymesh_to_inp.py splits each layer once more at the geometric point
+// 1/(1 + sqrt(r)), which doubles the number of layers and gives the growth
+// ratio sqrt(r). With the settings below,
+//     nLayers = 10, r = 1.44  ->  20 layers after splitting, ratio 1.2,
+//                                 first layer height ~2.5e-5 c,
+// and a jump of the cell height from the last layer to the core cells of ~3
+// (a direct mesh with ratio 1.2 gives a jump of ~6, since the jump is
+// roughly r/(r - 1) for many layers).
+// Allmesh reads nLayers and thicknessRatio from this file and passes them
+// to polymesh_to_inp.py.
+boundaryLayers
+{
+    patchBoundaryLayers
+    {
+        airfoil
+        {
+            nLayers                 10;     // -> 20 layers after splitting
+            thicknessRatio          1.44;   // -> 1.2 after splitting
+            allowDiscontinuity      0;
+        }
+    }
+    // farfield keeps the default single (unsplit) layer, i.e., a row of
+    // boundary-conforming cells along the circle
+}
+
+// ----------------------------------------------------------------------------
+// Patch types in the final OpenFOAM mesh. The z planes created by
+// cartesian2DMesh are always named bottomEmptyFaces/topEmptyFaces (type
+// empty); renaming them is ignored by cfMesh, and setting
+// defaultName/defaultType would turn them into walls.
+// ----------------------------------------------------------------------------
+renameBoundary
+{
+    newPatchNames
+    {
+        airfoil
+        {
+            newName     airfoil;
+            type        wall;
+        }
+
+        farfield
+        {
+            newName     farfield;
+            type        patch;
+        }
+    }
+}
+
+// ************************************************************************* //

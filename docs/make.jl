@@ -22,6 +22,7 @@ makedocs(modules = [AeroTrixi],
          pages = [
              "Home" => "index.md",
              "Trixi.jl-Gridap.jl bridge" => "trixi_gridap_bridge.md",
+             "Boundary-layer meshes with cfMesh" => "cfmesh_meshes.md",
              "API Reference" => [
                  "Overview" => "api.md",
                  "Surface quantities" => "api/surface_quantities.md",
