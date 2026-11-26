@@ -8,7 +8,9 @@
 #
 # The case directory (default: ./out_oat15a) is created if necessary and
 # receives all generated files; the final mesh is <case_directory>/oat15a_airfoil.inp.
-# Requires python3 with numpy and scipy.
+# Requires python3 with numpy and scipy. The cfMesh tools can be downloaded from
+# https://sourceforge.net/projects/cfmesh/ (tested with CF-MESH+ 5.4 installed from
+# that download); CFMESH_BIN is the directory <installation>/Mesher/bin.
 #
 # Steps:
 #   1) generate_geometry.py: airfoil + far-field circle as a "ribbon" STL

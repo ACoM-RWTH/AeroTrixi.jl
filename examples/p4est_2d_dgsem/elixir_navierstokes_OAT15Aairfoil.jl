@@ -18,11 +18,6 @@ using AeroTrixi
 #   AIAA Journal 43(7):1556-1566.
 #   [DOI: 10.2514/1.9885](https://doi.org/10.2514/1.9885)
 #
-# Note that Trixi.jl does not provide a turbulence model, i.e., the compressible
-# Navier-Stokes equations are solved for a laminar flow. Since the boundary layer in the
-# experiment is turbulent (tripped near the leading edge), this elixir demonstrates the
-# setup of such a simulation rather than providing a validated buffet prediction.
-#
 # The mesh with boundary layers is generated with cfMesh, see `utils/cfmesh` and the
 # documentation page "Boundary-layer meshes with cfMesh".
 
@@ -89,7 +84,7 @@ solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
 # lengths, generated with cfMesh by `utils/cfmesh/Allmesh`. The boundaries are given as
 # node sets `airfoil` and `farfield`.
 # TODO: Replace the URL below by the URL of the uploaded mesh file before merging.
-mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/REPLACE_WITH_GIST_ID/raw/oat15a_airfoil.inp",
+mesh_file = Trixi.download("https://gist.githubusercontent.com/DanielDoehring/148f027c7f59239b9983e06e5c16f7c2/raw/d32e626490c042a6350ff692b87d038f19ae02e4/oat15a_airfoil.inp",
                            joinpath(@__DIR__, "oat15a_airfoil.inp"))
 
 boundary_symbols = [:airfoil, :farfield]

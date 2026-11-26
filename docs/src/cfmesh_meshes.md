@@ -55,8 +55,12 @@ cd utils/cfmesh
 CFMESH_BIN=/path/to/cfMesh/bin ./Allmesh out_oat15a
 ```
 This creates the mesh `out_oat15a/oat15a_airfoil.inp` within a few seconds. Besides the
-cfMesh command-line tools `surfaceFeatureEdges` and `cartesian2DMesh` (tested with
-CF-MESH+ 5.4), Python 3 with NumPy and SciPy is required. The steps are:
+cfMesh command-line tools `surfaceFeatureEdges` and `cartesian2DMesh`, Python 3 with NumPy
+and SciPy is required. The cfMesh tools can be downloaded from the
+[cfMesh project page on SourceForge](https://sourceforge.net/projects/cfmesh/); the
+scripts were tested with the command-line tools installed by the installer from this
+download (CF-MESH+ 5.4), which are located in the directory `Mesher/bin` of the
+installation, i.e., `CFMESH_BIN` has to point to `<installation>/Mesher/bin`. The steps are:
 
 1. `generate_geometry.py`: the airfoil and the far-field boundary as a surface mesh (STL),
 2. `surfaceFeatureEdges`: conversion to the native cfMesh format `.fms` with feature edges,

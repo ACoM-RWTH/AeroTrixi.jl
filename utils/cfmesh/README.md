@@ -9,8 +9,14 @@ be read by Trixi.jl's `P4estMesh`. The boundaries are stored as node sets
 for the elixir `examples/p4est_2d_dgsem/elixir_navierstokes_OAT15Aairfoil.jl`.
 
 Requirements: the cfMesh command-line tools `surfaceFeatureEdges` and
-`cartesian2DMesh` (tested with CF-MESH+ 5.4), and Python 3 with NumPy and SciPy
-(Matplotlib for the optional preview in `check_mesh.py`).
+`cartesian2DMesh`, and Python 3 with NumPy and SciPy (Matplotlib for the optional
+preview in `check_mesh.py`).
+
+The cfMesh tools can be downloaded from the cfMesh project page on SourceForge:
+<https://sourceforge.net/projects/cfmesh/>. The scripts were tested with the
+command-line tools installed by the installer from this download (`cfMesh-installer-GUI-1_2_0`,
+which installs CF-MESH+ 5.4); they are in the `Mesher/bin` directory of the installation,
+which is what `CFMESH_BIN` has to point to.
 
 ```bash
 CFMESH_BIN=/path/to/cfMesh/bin ./Allmesh out_oat15a
