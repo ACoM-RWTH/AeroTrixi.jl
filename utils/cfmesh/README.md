@@ -33,7 +33,7 @@ mesh = P4estMesh{2}("out_oat15a/oat15a_airfoil.inp",
 | `oat15a_coordinates_c015.dat` | Airfoil coordinates (chord length 0.15, rescaled to 1) |
 | `generate_geometry.py` | Airfoil spline and far-field circle as a "ribbon" STL (input for `cartesian2DMesh`) |
 | `system/meshDict` | cfMesh settings: refinement and boundary layers of the coarse base mesh |
-| `system/controlDict`, `fvSchemes`, `fvSolution` | Minimal dictionaries required by the OpenFOAM-based cfMesh tools |
+| `system/controlDict` | Minimal OpenFOAM control dictionary required by `cartesian2DMesh` (incl. the write precision of the mesh) |
 | `polymesh_to_inp.py` | Converts the cfMesh (OpenFOAM `polyMesh`) mesh to conforming quads in Abaqus `.inp` format |
 | `check_mesh.py` | Optional quality check of the cfMesh base mesh (substitute for OpenFOAM's `checkMesh`) |
 | `inp_to_msh.py` | Converts a 2D Abaqus `.inp` mesh with node sets to the Gmsh format (MSH 2.2, ASCII) for inspection, e.g., `python3 inp_to_msh.py out_oat15a/oat15a_airfoil.inp` |
