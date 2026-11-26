@@ -49,7 +49,7 @@ equations_parabolic = CompressibleNavierStokesDiffusion2D(equations, mu = mu(),
 end
 initial_condition = initial_condition_freestream
 
-polydeg = 3
+polydeg = 2
 basis = LobattoLegendreBasis(polydeg)
 shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_max = 1.0,
@@ -57,23 +57,11 @@ shock_indicator = IndicatorHennemannGassner(equations, basis,
                                             alpha_smooth = true,
                                             variable = density_pressure)
 
-# In non-blended/limited regions, we use the cheaper weak form volume integral
-volume_integral_default = VolumeIntegralWeakForm()
-
-surface_flux = flux_hllc
+surface_flux = flux_hll
 volume_flux = flux_ranocha
-# For the blended/limited regions, we need to supply high-order and low-order volume integrals.
-volume_integral_blend_high_order = VolumeIntegralFluxDifferencing(volume_flux)
-volume_integral_blend_low_order = VolumeIntegralPureLGLFiniteVolumeO2(basis;
-                                                                      volume_flux_fv = surface_flux,
-                                                                      reconstruction_mode = reconstruction_O2_inner,
-                                                                      slope_limiter = minmod)
-
-volume_integral = VolumeIntegralShockCapturingHGType(shock_indicator;
-                                                     volume_integral_default = volume_integral_default,
-                                                     volume_integral_blend_high_order = volume_integral_blend_high_order,
-                                                     volume_integral_blend_low_order = volume_integral_blend_low_order)
-
+volume_integral = VolumeIntegralShockCapturingHG(shock_indicator;
+                                                 volume_flux_dg = volume_flux,
+                                                 volume_flux_fv = surface_flux)
 solver = DGSEM(polydeg = polydeg, surface_flux = surface_flux,
                volume_integral = volume_integral)
 
@@ -117,50 +105,11 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-force_boundary_names = (:airfoil,)
-drag_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           DragCoefficientPressure2D(aoa(), rho_inf(),
-                                                                     u_inf(),
-                                                                     airfoil_chord_length()))
-lift_coefficient = AnalysisSurfaceIntegral(force_boundary_names,
-                                           LiftCoefficientPressure2D(aoa(), rho_inf(),
-                                                                     u_inf(),
-                                                                     airfoil_chord_length()))
-drag_coefficient_shear_force = AnalysisSurfaceIntegral(force_boundary_names,
-                                                       DragCoefficientShearStress2D(aoa(),
-                                                                                    rho_inf(),
-                                                                                    u_inf(),
-                                                                                    airfoil_chord_length()))
-lift_coefficient_shear_force = AnalysisSurfaceIntegral(force_boundary_names,
-                                                       LiftCoefficientShearStress2D(aoa(),
-                                                                                    rho_inf(),
-                                                                                    u_inf(),
-                                                                                    airfoil_chord_length()))
-
 analysis_interval = 10_000
 analysis_callback = AnalysisCallback(semi, interval = analysis_interval,
                                      output_directory = "out",
                                      save_analysis = true,
-                                     analysis_errors = Symbol[],
-                                     analysis_integrals = (drag_coefficient,
-                                                           lift_coefficient,
-                                                           drag_coefficient_shear_force,
-                                                           lift_coefficient_shear_force))
-
-###############################################################################
-# AeroTrixi addition
-
-# Save the pressure and friction coefficients at all surface nodes of the airfoil,
-# e.g., to compare the pressure distribution with the experimental data of Jacquin et al.
-pressure_coefficient = SurfacePointwise(force_boundary_names,
-                                        SurfacePressureCoefficient(p_inf(), rho_inf(),
-                                                                   u_inf()))
-friction_coefficient = SurfacePointwise(force_boundary_names,
-                                        SurfaceFrictionCoefficient(rho_inf(), u_inf()))
-
-surface_pointwise_callback = SurfacePointwiseCallback(semi, pressure_coefficient,
-                                                      friction_coefficient;
-                                                      interval = analysis_interval)
+                                     analysis_errors = Symbol[])
 
 ###############################################################################
 
@@ -176,7 +125,7 @@ save_restart = SaveRestartCallback(interval = save_sol_interval,
                                    save_final_restart = true)
 
 callbacks = CallbackSet(summary_callback,
-                        analysis_callback, surface_pointwise_callback, alive_callback,
+                        analysis_callback, alive_callback,
                         save_solution, save_restart)
 
 ###############################################################################
@@ -184,7 +133,7 @@ callbacks = CallbackSet(summary_callback,
 
 ode_algorithm = SSPRK43(thread = Trixi.Threaded())
 
-time_int_tol = 1e-4
+time_int_tol = 1e-6
 sol = solve(ode, ode_algorithm;
             abstol = time_int_tol, reltol = time_int_tol, dt = 1e-6,
             maxiters = Inf, # long simulation
