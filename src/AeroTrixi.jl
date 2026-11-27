@@ -31,7 +31,8 @@ using Trixi: @printf, @sprintf,
              P4EST_MAXLEVEL, load_pointerwrapper_tree, unsafe_wrap_sc,
              calc_node_coordinates!, mpi_isparallel, ncells, @unpack,
              nnodes, nelements, get_node_vars, set_node_vars!,
-             DissipationLocalLaxFriedrichs
+             DissipationLocalLaxFriedrichs,
+             Gradient, Divergence # operator types of parabolic boundary conditions
 
 # import (not using!) functions that are extended
 import Trixi: pretty_form_ascii, pretty_form_utf,
@@ -77,6 +78,8 @@ export p4est_mesh_from_vertices, p4est_mesh_five_trees
 export P4estLnodesQ2, apply_hanging_constraints!, gridap_model, gridap_q2_space
 export transfer_dg_to_q2!, transfer_q2_to_dg!, Q2NodeData, q2_value, q2_gradient
 export CompressibleEulerPoissonEquations2D, source_terms_euler_poisson
+export boundary_condition_slip_wall_no_magnetic_field, BoundaryConditionVRMHDWall,
+       Isomagnetic
 export GridapCallback, gridap_stage_update
 export Q2Field, elliptic_fields, elliptic_sources, elliptic_forms, write_elliptic_solution,
        elliptic_spd

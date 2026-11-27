@@ -77,6 +77,46 @@ isdir(outdir) && rm(outdir, recursive = true)
         @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
     end
 
+    @trixi_testset "elixir_vrmhd_vortex_street.jl" begin
+        @test_trixi_include(joinpath(EXAMPLES_DIR,
+                                     "elixir_vrmhd_vortex_street.jl"),
+                            l2=[
+                                0.001088693661398491,
+                                0.00230297958212349,
+                                0.0009537708616214741,
+                                0.0,
+                                0.0069152845693084995,
+                                0.000314329782022174,
+                                3.907640247530638e-5,
+                                0.0,
+                                0.00023033135070597336
+                            ],
+                            linf=[
+                                0.22354530836776926,
+                                0.4541847220138342,
+                                0.23723854199013947,
+                                0.0,
+                                1.5097754953787195,
+                                0.0695876721142352,
+                                0.00810467563463098,
+                                0.0,
+                                0.060603128475278704
+                            ],
+                            tspan=(0.0, 0.02))
+        # Ensure that we do not have excessive memory allocations
+        # (e.g., from type instabilities).
+        # `Trixi.solve` of the relaxation method calls the right-hand sides within its own
+        # timer sections. Thus, the first direct call below creates new entries in the
+        # timer of Trixi.jl, which allocates once (~10 kB). Call the right-hand sides once
+        # to measure only the allocations of the right-hand sides themselves.
+        let du = similar(sol.u[end])
+            Trixi.rhs_hyperbolic!(du, sol.u[end], semi, sol.t[end])
+            Trixi.rhs_parabolic!(du, sol.u[end], semi, sol.t[end])
+        end
+        @test_allocations(Trixi.rhs_hyperbolic!, semi, sol, 1000)
+        @test_allocations(Trixi.rhs_parabolic!, semi, sol, 1000)
+    end
+
     @trixi_testset "elixir_euler_poisson_blast_five_trees_amr.jl" begin
         @test_trixi_include(joinpath(EXAMPLES_DIR,
                                      "elixir_euler_poisson_blast_five_trees_amr.jl"),
