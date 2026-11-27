@@ -24,6 +24,11 @@ rarefied gases, for instance.
   its faster approximation [`flux_oblapenko_etal_taylor`](@ref); chemical reactions are
   possible via source terms (see [Multi-species equations](api/multispecies_equations.md)).
 - **AUSM+ and AUSM+-up fluxes**: [`flux_ausmplus`](@ref) and its all-speed extension [`FluxAUSMPlusUp`](@ref) (default instance `flux_ausmplusup`) for Trixi.jl's `CompressibleEulerEquations1D`, advection upstream splitting fluxes usable as surface flux or in finite volume schemes
+- **Visco-resistive MHD boundary conditions**: a slip wall with vanishing magnetic field
+  ([`boundary_condition_slip_wall_no_magnetic_field`](@ref)) and walls with prescribed
+  velocity, heat flux, and magnetic field ([`BoundaryConditionVRMHDWall`](@ref),
+  [`Isomagnetic`](@ref)) for Trixi.jl's `IdealGlmMhdEquations2D` and `ViscoResistiveMhd2D`
+  (see [Visco-resistive MHD](api/visco_resistive_mhd.md)).
 - **Boundary-layer meshes with cfMesh**: scripts in `utils/cfmesh` to generate
   all-quadrilateral airfoil meshes with boundary layers for the `P4estMesh` of Trixi.jl
   with [cfMesh](https://cfmesh.com), demonstrated for the ONERA OAT 15A airfoil, and to
@@ -54,6 +59,7 @@ To get started, it is best to take a look at the examples in the folder returned
 |---|---|
 | Aerodynamic flows and surface quantities | `p4est_2d_dgsem/elixir_euler_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_NACA0012airfoil_mach08.jl`, `p4est_2d_dgsem/elixir_navierstokes_OAT15Aairfoil.jl` (transonic buffet conditions, mesh with boundary layers), `p4est_3d_dgsem/elixir_euler_ONERA_M6_AVI.jl` (with surface coefficients), `p4est_3d_dgsem/elixir_euler_DPW3_wing.jl` |
 | Multi-species flows | `tree_2d_dgsem/elixir_eulermst1T_ec.jl` (entropy conservation), `tree_2d_dgsem/elixir_eulermst1T_chem.jl` (dissociation), `p4est_2d_dgsem/elixir_eulerms1T_1speciescylinder.jl`, `p4est_2d_dgsem/elixir_eulerms1T_2speciescylinder_chem.jl` (hypersonic cylinder) |
+| Visco-resistive MHD | `p4est_2d_dgsem/elixir_vrmhd_vortex_street.jl` (magnetized vortex street behind a cylinder) |
 | Trixi.jl-Gridap.jl bridge | `p4est_2d_dgsem/elixir_euler_poisson_blast_five_trees_amr.jl` |
 
 ## Documentation
